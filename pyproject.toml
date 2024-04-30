@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "state-cancer-profile-scraper"
+version = "0.1.0"
+description = ""
+authors = ["Sean Davis <seandavi@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "scps"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+bs4 = "^0.0.2"
+httpx = "^0.27.0"
+pandas = "^2.2.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
