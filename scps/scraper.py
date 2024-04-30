@@ -31,6 +31,8 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import logging
 
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
