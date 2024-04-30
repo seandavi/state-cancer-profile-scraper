@@ -159,7 +159,7 @@ def get_table(
 # This function uses argparse to collect the command line arguments
 # and then calls get_table() with those arguments.
 # use last five years of data (year=0), all states (stateFIPS=00)
-def master_table(year: str = "0", stateFIPS="08", _type="incd"):
+def master_table(year: str = "0", stateFIPS="00", _type="incd"):
     select_options = get_select_options()
     print(select_options)
     dflist = []
