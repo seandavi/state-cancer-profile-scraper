@@ -29,6 +29,10 @@ options are not valid for some of the other options.
 import httpx
 import pandas as pd
 from bs4 import BeautifulSoup
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def get_select_options() -> dict:
@@ -103,7 +107,7 @@ def get_table(
         f"&stage={stage}&year={year}"
         f"&sex={sex}&age={age}&type={_type}&output=1"
     )
-    print(url)
+    logger.debug(url)
 
     df = pd.read_csv(
         url,
@@ -150,8 +154,8 @@ def get_table(
         try:
             df[numeric_column] = pd.to_numeric(df[numeric_column], errors="coerce")
         except Exception as e:
-            print("Caught excption but it is meant to be ignored")
-            print(e)
+            logger.debug("Caught an expected exception, so ignoring")
+            logger.debug(e)
             pass
     return df[df[rate_col].notna()]
 
@@ -164,9 +168,9 @@ def master_table(year: str = "0", stateFIPS="00", _type="incd"):
     print(select_options)
     dflist = []
     cancers = list(select_options["cancer"].keys())
-    print(cancers)
+    logger.info(f"Number of cancers: {len(cancers)}")
     for cancer in list(select_options["cancer"].keys())[6:]:
-        print(cancer)
+        logger.info(f"Getting data for cancer {cancer}")
 
         # The state cancer profiles folks in their
         # decided to make the age
@@ -196,7 +200,8 @@ def master_table(year: str = "0", stateFIPS="00", _type="incd"):
                         except KeyboardInterrupt:
                             raise
                         except Exception as e:
-                            print(e)
+                            logger.debug("Caught an exception, but ignoring it")
+                            logger.debug(e)
                             pass
     df = pd.concat(dflist)
     return df
@@ -205,11 +210,16 @@ def master_table(year: str = "0", stateFIPS="00", _type="incd"):
 def main():
     import json
 
+    logger.info("Getting select options")
     json.dump(get_select_options(), open("select_options.json", "w"))
 
+    logger.info("Getting incidence data")
     df = master_table(_type="incd")
+    logger.info("Saving incidence data with shape: %s", str(df.shape))
     df.to_csv("state_cancer_profiles_incidence.csv.gz", index=False, compression="gzip")
+    logger.info("Getting death data")
     df = master_table(_type="death")
+    logger.info("Saving death data with shape: %s", str(df.shape))
     df.to_csv("state_cancer_profiles_death.csv.gz", index=False, compression="gzip")
 
 
