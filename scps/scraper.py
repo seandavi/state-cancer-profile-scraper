@@ -171,8 +171,9 @@ def master_table(year: str = "0", stateFIPS="00", _type="incd"):
     dflist = []
     cancers = list(select_options["cancer"].keys())
     logger.info(f"Number of cancers: {len(cancers)}")
-    for cancer in list(select_options["cancer"].keys())[6:]:
-        logger.info(f"Getting data for cancer {cancer}")
+    for cancer in list(select_options["cancer"].keys()):
+        cancer_name = select_options["cancer"][cancer]
+        logger.info(f"Getting data for cancer: {cancer_name}")
 
         # The state cancer profiles folks in their
         # decided to make the age
