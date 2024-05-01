@@ -26,14 +26,3 @@ jobs:
     - name: Install dependencies
       run: poetry install
 
-    - name: Run script
-      run: poetry run python -m scps.scraper
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: state_cancer_profiles_data
-        path: 
-          state_cancer_profiles_incidence.csv.gz
-          state_cancer_profiles_mortality.csv.gz
-          select_options.json
