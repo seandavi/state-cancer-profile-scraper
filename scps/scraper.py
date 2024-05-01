@@ -220,6 +220,8 @@ def master_table(year: str = "0", stateFIPS="00", _type="incd"):
             "lower_95pct_confidence_interval_1": "ci_rank_lower_95pct_confidence_interval",
             "upper_95pct_confidence_interval_1": "ci_rank_upper_95pct_confidence_interval",
             "county": "full_locale",
+            "age_adjusted_incidence_raterate_note___cases_per_100_000": "age_adjusted_incidence_rate__cases_per_100_000",
+            "age_adjusted_death_raterate_note___deaths_per_100_000": "age_adjusted_death_rate__deaths_per_100_000",
         },
         inplace=True,
     )
