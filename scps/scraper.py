@@ -34,7 +34,7 @@ import logging
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("scps.scraper")
 
 
 def get_select_options() -> dict:
@@ -85,6 +85,9 @@ def column_text_replace(txt: str) -> str:
     )
 
 
+select_opts = get_select_options()
+
+
 def get_table(
     year: str = "0",
     stateFIPS: str = "00",  # 00 includes all states
@@ -121,8 +124,6 @@ def get_table(
     )
     df.columns = [column_text_replace(c) for c in df.columns]
 
-    select_opts = get_select_options()
-
     def get_text_from_select_id(group, id):
         return select_opts[group][id]
 
@@ -141,6 +142,7 @@ def get_table(
     df.loc[df["fips"].str.startswith("00"), "locale_type"] = "national"
     df.loc[df["county"].str.contains("County"), "locale_type"] = "county"
     df["_extracted_at"] = pd.Timestamp.now().isoformat()
+    # to allow for easy linkout to the website
     df["url"] = url.replace("&output=1", "")
     for numeric_column in [
         rate_col,
@@ -199,6 +201,9 @@ def master_table(year: str = "0", stateFIPS="00", _type="incd"):
                                 stage=stage,
                                 _type=_type,
                             )
+                            logger.debug(
+                                f"Got data for {cancer_name}, shape {df.shape}"
+                            )
                             dflist.append(df)
                         except KeyboardInterrupt:
                             raise
@@ -207,6 +212,17 @@ def master_table(year: str = "0", stateFIPS="00", _type="incd"):
                             logger.debug(e)
                             pass
     df = pd.concat(dflist)
+    df[["locale", "state"]] = df.county.str.replace(
+        r"\(.*\)", "", regex=True
+    ).str.split(", ", expand=True, n=1)
+    df.rename(
+        columns={
+            "lower_95pct_confidence_interval_1": "ci_rank_lower_95pct_confidence_interval",
+            "upper_95pct_confidence_interval_1": "ci_rank_upper_95pct_confidence_interval",
+            "county": "full_locale",
+        },
+        inplace=True,
+    )
     return df
 
 
