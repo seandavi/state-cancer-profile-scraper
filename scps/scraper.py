@@ -135,7 +135,10 @@ def get_table(
     df["areatype"] = get_text_from_select_id("areatype", areatype)
     df["age"] = get_text_from_select_id("age", age)
     df["state_fips"] = df["fips"].str[:2]
-    df["measurement"] = _type
+    if _type == "incd":
+        df["measurement"] = "incidence"
+    else:
+        df["measurement"] = "mortality"
     df["locale_type"] = "other"
     df.loc[df["fips"].isna(), "fips"] = ""
     df.loc[df["fips"].str.endswith("000"), "locale_type"] = "state"
@@ -169,7 +172,7 @@ def get_table(
 # use last five years of data (year=0), all states (stateFIPS=00)
 def master_table(year: str = "0", stateFIPS="00", _type="incd"):
     select_options = get_select_options()
-    print(select_options)
+    logger.info(str(select_options))
     dflist = []
     cancers = list(select_options["cancer"].keys())
     logger.info(f"Number of cancers: {len(cancers)}")
@@ -215,16 +218,35 @@ def master_table(year: str = "0", stateFIPS="00", _type="incd"):
     df[["locale", "state"]] = df.county.str.replace(
         r"\(.*\)", "", regex=True
     ).str.split(", ", expand=True, n=1)
+    if _type == "incd":
+        column_translation = {
+            "lower_95pct_confidence_interval_1": "lower_ci_trend_in_rate",
+            "upper_95pct_confidence_interval_1": "upper_ci_trend_in_rate",
+            "county": "reported_locale",
+            "age_adjusted_incidence_raterate_note___cases_per_100_000": "age_adjusted_rate_per_100_000",
+            "ci_rankrank_note": "ci_rank",
+            "lower_ci_ci_rank": "lower_ci_rank",
+            "upper_ci_ci_rank": "upper_ci_rank",
+            "recent_5_year_trend_trend_note_in_incidence_rates": "recent_5_year_trend_in_rate",
+            "lower_95pct_confidence_interval": "lower_ci_rate",
+            "upper_95pct_confidence_interval": "upper_ci_rate",
+        }
+    if _type == "death":
+        column_translation = {
+            "county": "reported_locale",
+            "age_adjusted_death_raterate_note___deaths_per_100_000": "age_adjusted_rate_per_100_000",
+            "ci_rankrank_note": "ci_rank",
+            "lower_ci_ci_rank": "lower_ci_rank",
+            "upper_ci_ci_rank": "upper_ci_rank",
+            "recent_5_year_trend_trend_note_in_death_rates": "recent_5_year_trend_in_rate",
+            "lower_95pct_confidence_interval": "lower_ci_trend_in_rate",
+            "upper_95pct_confidence_interval": "upper_ci_trend_in_rate",
+        }
     df.rename(
-        columns={
-            "lower_95pct_confidence_interval_1": "ci_rank_lower_95pct_confidence_interval",
-            "upper_95pct_confidence_interval_1": "ci_rank_upper_95pct_confidence_interval",
-            "county": "full_locale",
-            "age_adjusted_incidence_raterate_note___cases_per_100_000": "age_adjusted_incidence_rate__cases_per_100_000",
-            "age_adjusted_death_raterate_note___deaths_per_100_000": "age_adjusted_death_rate__deaths_per_100_000",
-        },
+        columns=column_translation,
         inplace=True,
     )
+    df = df.loc[:, ~df.columns.str.startswith("met_")]
     return df
 
 
@@ -240,8 +262,8 @@ def main():
     df.to_csv("state_cancer_profiles_incidence.csv.gz", index=False, compression="gzip")
     logger.info("Getting death data")
     df = master_table(_type="death")
-    logger.info("Saving death data with shape: %s", str(df.shape))
-    df.to_csv("state_cancer_profiles_death.csv.gz", index=False, compression="gzip")
+    logger.info("Saving mortality data with shape: %s", str(df.shape))
+    df.to_csv("state_cancer_profiles_mortality.csv.gz", index=False, compression="gzip")
 
 
 if __name__ == "__main__":
