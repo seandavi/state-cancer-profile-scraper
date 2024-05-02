@@ -4,3 +4,4 @@ select_options.json
 state_cancer_profiles_incidence.csv.gz
 state_cancer_profiles_incidence.csv
 state_cancer_profiles_select_options.json
+state_cancer_profiles_mortality.csv.gz
