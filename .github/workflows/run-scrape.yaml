@@ -26,3 +26,18 @@ jobs:
     - name: Install dependencies
       run: poetry install
 
+    - name: Run scrape
+      run: poetry run python -m scps.scraper
+
+    - name: Tag with gh_hash
+      run: echo ${{ github.sha }} > gh_hash.txt
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          gh_hash.txt
+          state_cancer_profiles_incidence.csv.gz
+          state_cancer_profiles_mortality.csv.gz
+          select_options.json
