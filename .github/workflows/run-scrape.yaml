@@ -1,10 +1,11 @@
-name: Run scrape
+name: Create data release
 
 on:
-  schedule: 
-    - cron: '0 0 1 * *'
   workflow_dispatch:
-
+  # run on a tag with a push only
+  push:
+    tags:
+      - "*"
 jobs:
   build:
     permissions:
@@ -46,6 +47,7 @@ jobs:
 
     - name: Release
       uses: softprops/action-gh-release@v2
+
       with:
         name: release-${{ steps.date.outputs.date }}
         body_path: release_note.txt
