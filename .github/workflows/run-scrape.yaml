@@ -40,15 +40,15 @@ jobs:
 
     - name: Create release note
       run: |
-        echo "State Cancer Profile Data\n\nScraped: ${DATE}"
+        echo "State Cancer Profile Data\n\nScraped: ${DATE}" > release_note.txt
       env:
         DATE: ${{ steps.date.outputs.date }}
 
     - name: Release
       uses: softprops/action-gh-release@v2
-      name: release-${{ steps.date.outputs.date }}
-      body: 
       with:
+        name: release-${{ steps.date.outputs.date }}
+        body_path: release_note.txt
         files: |
           gh_hash.txt
           state_cancer_profiles_incidence.csv.gz
