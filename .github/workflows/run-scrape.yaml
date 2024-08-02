@@ -1,13 +1,15 @@
 name: Run scrape
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  schedule: 
+  - cron: '0 0 1 * *'
+  workflow_dispatch: true
 
 jobs:
   build:
+    permissions:
+      contents: write
+
     runs-on: ubuntu-latest
 
     steps:
@@ -32,9 +34,20 @@ jobs:
     - name: Tag with gh_hash
       run: echo ${{ github.sha }} > gh_hash.txt
 
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
+    - name: Create release note
+      run: |
+        echo "State Cancer Profile Data\n\nScraped: ${DATE}"
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+
     - name: Release
       uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
+      name: release-${{ steps.date.outputs.date }}
+      body: 
       with:
         files: |
           gh_hash.txt
