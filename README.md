@@ -4,6 +4,10 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/seandavi/state-cancer-profile-scraper/total)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/seandavi/state-cancer-profile-scraper/.github%2Fworkflows%2Frun-scrape.yaml?label=Scrape%20status)
 
+For the TLDR, the data for _incidence_ and _mortality_ are available for download from:
+
+- <https://github.com/seandavi/state-cancer-profile-scraper/releases/latest>
+
 
 This is a simple web scraper that extracts cancer data from the [State Cancer Profiles](https://statecancerprofiles.cancer.gov/) website. The data is extracted for all states and saved in two CSV files: one for cancer incidence and one for cancer mortality.
 
