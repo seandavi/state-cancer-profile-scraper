@@ -6,3 +6,5 @@ state_cancer_profiles_incidence.csv
 state_cancer_profiles_select_options.json
 state_cancer_profiles_mortality.csv.gz
 .DS_Store
+README_files
+README.html
