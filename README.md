@@ -8,6 +8,8 @@ For the TLDR, the data for _incidence_ and _mortality_ are available for downloa
 
 - <https://github.com/seandavi/state-cancer-profile-scraper/releases/latest>
 
+A new release is **generated every month with the latest data**. 
+
 ## Contents
 
 - [State cancer profiles scraper](#state-cancer-profiles-scraper)
