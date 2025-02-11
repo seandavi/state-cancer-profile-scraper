@@ -4,6 +4,8 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/seandavi/state-cancer-profile-scraper/total)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/seandavi/state-cancer-profile-scraper/.github%2Fworkflows%2Frun-scrape.yaml?label=Scrape%20status)
 
+The [state cancer profiles website](https://statecancerprofiles.cancer.gov/) hosts visualization and data exploration tools for cancer incidence and mortality in the United States. For casual browsing, the website is great. However, if having access to the underlying data is the goal, the existing site does not have bulk downloads or an API. Therefore, **we provide bulk data scraped from the website for data science applications**. 
+
 For the TLDR, the data for _incidence_ and _mortality_ are available for download from:
 
 - <https://github.com/seandavi/state-cancer-profile-scraper/releases/latest>
