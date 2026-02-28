@@ -1,51 +1,46 @@
 """Configure pytest and mock the module-level HTTP call in scps.scraper.
 
 scps.scraper calls get_select_options() at import time (module level), which
-makes a real HTTP request.  We intercept that request here – before any test
-module imports scps.scraper – so the test suite can run fully offline.
+makes a real HTTP request.  We intercept that request here via pytest hooks so
+that the module is only imported once with a mocked httpx.get and the test suite
+can run fully offline.
 """
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Minimal HTML that satisfies get_select_options() parsing.
-# Defined once here and shared with test modules via the fixture below.
-MOCK_SELECT_HTML = """
-<html>
-<body>
-  <select id="cancer">
-    <option value="001">All Cancer Sites Combined</option>
-  </select>
-  <select id="year">
-    <option value="0">Latest 5 Year Average</option>
-  </select>
-  <select id="race">
-    <option value="00">All Races</option>
-  </select>
-  <select id="sex">
-    <option value="0">Both Sexes</option>
-  </select>
-  <select id="areatype">
-    <option value="county">County</option>
-  </select>
-  <select id="stage">
-    <option value="999">All Stages</option>
-  </select>
-  <select id="age">
-    <option value="001">All Ages</option>
-  </select>
-</body>
-</html>
-"""
+from tests._mock_data import MOCK_SELECT_HTML
 
 _mock_response = MagicMock()
 _mock_response.text = MOCK_SELECT_HTML
 
-# Patch httpx.get so that the module-level get_select_options() call in
-# scps.scraper does not perform a real network request.
-with patch("httpx.get", return_value=_mock_response):
+_patched_httpx_get = None
+
+
+def pytest_configure(config):
+    """Patch httpx.get and import scps.scraper once for the whole test run."""
+    global _patched_httpx_get
+
+    if _patched_httpx_get is not None:
+        # Already configured (can happen if conftest is imported more than once).
+        return
+
+    _patched_httpx_get = patch("httpx.get", return_value=_mock_response)
+    _patched_httpx_get.start()
+
+    # Import scps.scraper after httpx.get is patched so its module-level
+    # get_select_options() call uses the mock instead of performing I/O.
     import scps.scraper  # noqa: F401
+
+
+def pytest_unconfigure(config):
+    """Undo the httpx.get patch applied in pytest_configure."""
+    global _patched_httpx_get
+
+    if _patched_httpx_get is not None:
+        _patched_httpx_get.stop()
+        _patched_httpx_get = None
 
 
 @pytest.fixture()

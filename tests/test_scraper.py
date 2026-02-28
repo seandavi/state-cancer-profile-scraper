@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from scps.scraper import column_text_replace, get_select_options
-from tests.conftest import MOCK_SELECT_HTML
+from tests._mock_data import MOCK_SELECT_HTML
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +62,6 @@ class TestColumnTextReplace:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.usefixtures("mock_select_response")
 class TestGetSelectOptions:
     def test_returns_dict(self, mock_select_response):
         with patch("httpx.get", return_value=mock_select_response):
