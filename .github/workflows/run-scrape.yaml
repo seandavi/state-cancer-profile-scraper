@@ -25,7 +25,7 @@ jobs:
         python-version: "3.11"
 
     - name: Install dependencies
-      run: uv sync
+      run: uv sync --frozen
 
     - name: Run scrape
       run: uv run python -m scps.scraper
