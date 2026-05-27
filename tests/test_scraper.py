@@ -1,50 +1,11 @@
 """Basic tests for the scps.scraper module."""
 
-import io
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Minimal HTML that mimics the state cancer profiles select options page.
-# get_select_options() is called at module import time, so we must patch
-# httpx.get *before* importing scps.scraper.
-MOCK_SELECT_HTML = """
-<html>
-<body>
-  <select id="cancer">
-    <option value="001">All Cancer Sites</option>
-    <option value="071">Bladder</option>
-  </select>
-  <select id="year">
-    <option value="0">Latest 5-year average</option>
-  </select>
-  <select id="race">
-    <option value="00">All Races (includes Hispanic)</option>
-  </select>
-  <select id="sex">
-    <option value="0">Both Sexes</option>
-    <option value="1">Male</option>
-    <option value="2">Female</option>
-  </select>
-  <select id="age">
-    <option value="001">All Ages</option>
-  </select>
-  <select id="stage">
-    <option value="999">All Stages</option>
-  </select>
-  <select id="areatype">
-    <option value="county">By County</option>
-    <option value="state">By State/Registry/Division</option>
-  </select>
-</body>
-</html>
-"""
-
-_mock_http_response = MagicMock()
-_mock_http_response.text = MOCK_SELECT_HTML
-
-with patch("httpx.get", return_value=_mock_http_response):
-    from scps import scraper
+from scps import scraper
+from tests.conftest import MOCK_SELECT_HTML
 
 
 # ---------------------------------------------------------------------------

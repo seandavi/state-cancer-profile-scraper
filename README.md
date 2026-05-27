@@ -7,13 +7,22 @@
 [![DOI](https://zenodo.org/badge/794255451.svg)](https://doi.org/10.5281/zenodo.13174526)
 
 
-The [state cancer profiles website](https://statecancerprofiles.cancer.gov/) hosts visualization and data exploration tools for cancer incidence and mortality in the United States. For casual browsing, the website is great. However, if having access to the underlying data is the goal, the existing site does not have bulk downloads or an API. Therefore, **we provide bulk data scraped from the website for data science applications**. 
+The [state cancer profiles website](https://statecancerprofiles.cancer.gov/) hosts visualization and data exploration tools for cancer incidence and mortality in the United States. For casual browsing, the website is great. However, if having access to the underlying data is the goal, the existing site does not have bulk downloads or an API. Therefore, **we provide bulk data scraped from the website for data science applications**.
 
-For the TLDR, the data for _incidence_ and _mortality_ are available for download from:
+Each release ships four gzipped CSVs:
+
+- `state_cancer_profiles_incidence.csv.gz` — age-adjusted incidence rates (by cancer, age, sex, race, stage)
+- `state_cancer_profiles_mortality.csv.gz` — age-adjusted mortality rates (same dimensions)
+- `state_cancer_profiles_risk.csv.gz` — BRFSS-derived screening and risk-factor prevalence (alcohol, smoking, mammograms, colonoscopy, HPV vaccination, etc.)
+- `state_cancer_profiles_demographics.csv.gz` — ACS-derived demographics (crowding, education, poverty, SVI, etc.)
+
+All four files cover both county-level and state-level rows in the same file (plus the national row at FIPS `00000`), distinguished by the `locale_type` column.
+
+Download from:
 
 - <https://github.com/seandavi/state-cancer-profile-scraper/releases/latest>
 
-A new release is **generated every month with the latest data**. 
+A new release is **generated every month with the latest data**.
 
 ## Contents
 
@@ -120,13 +129,29 @@ pip install git+https://github.com/seandavi/state-cancer-profiles-scraper.git
 
 ### Running the scraper
 
-To run the scraper, use the following command:
+After installation, a `scps-scraper` command is available:
+
+```bash
+# Scrape everything (incidence, mortality, risk, demographics)
+scps-scraper scrape
+
+# Pick a subset
+scps-scraper scrape --datasets risk --datasets demographics
+
+# Write to a specific directory
+scps-scraper scrape --output-dir ./data
+
+# See all options
+scps-scraper scrape --help
+```
+
+The legacy module invocation is preserved and produces the same outputs:
 
 ```bash
 python -m scps.scraper
 ```
 
-The scraper will save the data in current working directory.
+The scraper writes gzipped CSVs to the current working directory (or `--output-dir`).
 
 ## License
 

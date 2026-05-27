@@ -28,7 +28,7 @@ jobs:
       run: uv sync --frozen
 
     - name: Run scrape
-      run: uv run python -m scps.scraper
+      run: uv run scps-scraper scrape
 
     - name: Tag with gh_hash
       run: echo ${{ github.sha }} > gh_hash.txt
@@ -54,4 +54,6 @@ jobs:
           gh_hash.txt
           state_cancer_profiles_incidence.csv.gz
           state_cancer_profiles_mortality.csv.gz
+          state_cancer_profiles_risk.csv.gz
+          state_cancer_profiles_demographics.csv.gz
           select_options.json

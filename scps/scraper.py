@@ -279,26 +279,16 @@ def master_table(
 
 
 def main():
-    import json
+    """Run the full scrape (incidence, mortality, risk, demographics).
 
-    logger.info("Getting select options")
-    json.dump(get_select_options(), open("select_options.json", "w"))
+    Kept as a thin wrapper around the click CLI so that
+    ``python -m scps.scraper`` and ``scps-scraper scrape`` produce the same
+    output set.
+    """
+    from scps.cli import cli
 
-    # Iterate county + state so downstream consumers get state rollups and
-    # the national row (FIPS 00000) in the same file. HSA is intentionally
-    # omitted from the default release run — it uses a non-FIPS area key
-    # and most downstream joins assume county/state FIPS.
-    default_areatypes = ("county", "state")
-
-    logger.info("Getting incidence data (areatypes=%s)", default_areatypes)
-    df = master_table(_type="incd", areatypes=default_areatypes)
-    logger.info("Saving incidence data with shape: %s", str(df.shape))
-    df.to_csv("state_cancer_profiles_incidence.csv.gz", index=False, compression="gzip")
-    logger.info("Getting death data (areatypes=%s)", default_areatypes)
-    df = master_table(_type="death", areatypes=default_areatypes)
-    logger.info("Saving mortality data with shape: %s", str(df.shape))
-    df.to_csv("state_cancer_profiles_mortality.csv.gz", index=False, compression="gzip")
+    cli(args=["scrape"], standalone_mode=False)
 
 
 if __name__ == "__main__":
-    print(main())
+    main()
