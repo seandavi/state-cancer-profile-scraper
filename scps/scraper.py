@@ -26,6 +26,8 @@ options are not valid for some of the other options.
 
 """
 
+from collections.abc import Iterable
+
 import httpx
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -170,50 +172,76 @@ def get_table(
 # This function uses argparse to collect the command line arguments
 # and then calls get_table() with those arguments.
 # use last five years of data (year=0), all states (stateFIPS=00)
-def master_table(year: str = "0", stateFIPS="00", _type="incd"):
+def master_table(
+    year: str = "0",
+    stateFIPS: str = "00",
+    _type: str = "incd",
+    areatypes: Iterable[str] = ("county",),
+):
+    """Scrape every (cancer × age × sex × race × stage × areatype) combination.
+
+    Parameters
+    ----------
+    areatypes : iterable of str
+        One or more areatype values to iterate. The website supports
+        ``"county"``, ``"state"``, and ``"hsa"`` (health service area).
+        Defaults to ``("county",)`` for backward compatibility with the
+        single-areatype behaviour of earlier releases. Pass
+        ``("county", "state")`` (the new default in ``main``) to capture
+        state-level rollups — including the national row at FIPS ``00000`` —
+        in the same output frame.
+    """
     select_options = get_select_options()
     logger.info(str(select_options))
     dflist = []
     cancers = list(select_options["cancer"].keys())
     logger.info(f"Number of cancers: {len(cancers)}")
-    for cancer in list(select_options["cancer"].keys()):
-        cancer_name = select_options["cancer"][cancer]
-        logger.info(f"Getting data for cancer: {cancer_name}")
+    for areatype in areatypes:
+        logger.info(f"Getting data for areatype: {areatype}")
+        for cancer in cancers:
+            cancer_name = select_options["cancer"][cancer]
+            logger.info(
+                f"Getting data for cancer: {cancer_name} (areatype={areatype})"
+            )
 
-        # The state cancer profiles folks in their
-        # decided to make the age
-        # groups for cancer 515 and 516 (pediatrics) different
-        # than the other cancers. So we have to
-        # handle them separately.
-        if cancer == "516":
-            ages = ["016"]
-        elif cancer == "515":
-            ages = ["015"]
-        else:
-            ages = select_options["age"].keys()
-        for age in ages:
-            for sex in select_options["sex"].keys():
-                for race in select_options["race"].keys():
-                    for stage in select_options["stage"].keys():
-                        try:
-                            df = get_table(
-                                cancer=cancer,
-                                age=age,
-                                sex=sex,
-                                race=race,
-                                stage=stage,
-                                _type=_type,
-                            )
-                            logger.debug(
-                                f"Got data for {cancer_name}, shape {df.shape}"
-                            )
-                            dflist.append(df)
-                        except KeyboardInterrupt:
-                            raise
-                        except Exception as e:
-                            logger.debug("Caught an exception, but ignoring it")
-                            logger.debug(e)
-                            pass
+            # The state cancer profiles folks in their
+            # decided to make the age
+            # groups for cancer 515 and 516 (pediatrics) different
+            # than the other cancers. So we have to
+            # handle them separately.
+            if cancer == "516":
+                ages = ["016"]
+            elif cancer == "515":
+                ages = ["015"]
+            else:
+                ages = select_options["age"].keys()
+            for age in ages:
+                for sex in select_options["sex"].keys():
+                    for race in select_options["race"].keys():
+                        for stage in select_options["stage"].keys():
+                            try:
+                                df = get_table(
+                                    cancer=cancer,
+                                    age=age,
+                                    sex=sex,
+                                    race=race,
+                                    stage=stage,
+                                    areatype=areatype,
+                                    _type=_type,
+                                )
+                                logger.debug(
+                                    f"Got data for {cancer_name} "
+                                    f"(areatype={areatype}), shape {df.shape}"
+                                )
+                                dflist.append(df)
+                            except KeyboardInterrupt:
+                                raise
+                            except Exception as e:
+                                logger.debug(
+                                    "Caught an exception, but ignoring it"
+                                )
+                                logger.debug(e)
+                                pass
     df = pd.concat(dflist)
     df[["locale", "state"]] = df.county.str.replace(
         r"\(.*\)", "", regex=True
@@ -256,12 +284,18 @@ def main():
     logger.info("Getting select options")
     json.dump(get_select_options(), open("select_options.json", "w"))
 
-    logger.info("Getting incidence data")
-    df = master_table(_type="incd")
+    # Iterate county + state so downstream consumers get state rollups and
+    # the national row (FIPS 00000) in the same file. HSA is intentionally
+    # omitted from the default release run — it uses a non-FIPS area key
+    # and most downstream joins assume county/state FIPS.
+    default_areatypes = ("county", "state")
+
+    logger.info("Getting incidence data (areatypes=%s)", default_areatypes)
+    df = master_table(_type="incd", areatypes=default_areatypes)
     logger.info("Saving incidence data with shape: %s", str(df.shape))
     df.to_csv("state_cancer_profiles_incidence.csv.gz", index=False, compression="gzip")
-    logger.info("Getting death data")
-    df = master_table(_type="death")
+    logger.info("Getting death data (areatypes=%s)", default_areatypes)
+    df = master_table(_type="death", areatypes=default_areatypes)
     logger.info("Saving mortality data with shape: %s", str(df.shape))
     df.to_csv("state_cancer_profiles_mortality.csv.gz", index=False, compression="gzip")
 

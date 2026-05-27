@@ -192,6 +192,73 @@ def test_get_table_uses_correct_url():
     assert "output=1" in url
 
 
+def test_master_table_iterates_areatypes():
+    """master_table passes each requested areatype through to get_table."""
+    captured_areatypes = []
+
+    def fake_get_table(**kwargs):
+        captured_areatypes.append(kwargs.get("areatype"))
+        import pandas as pd
+        # master_table splits `county` on ", " into (locale, state) — use a
+        # comma-bearing string so the split produces two columns.
+        return pd.DataFrame(
+            {
+                "county": ["Somewhere County, CO"],
+                "fips": ["08001"],
+                "age_adjusted_incidence_raterate_note___cases_per_100_000": [1.0],
+            }
+        )
+
+    # Trim the select option universe so the run is fast.
+    tiny_opts = {
+        "cancer": {"001": "All Cancer Sites"},
+        "age": {"001": "All Ages"},
+        "sex": {"0": "Both Sexes"},
+        "race": {"00": "All Races (includes Hispanic)"},
+        "stage": {"999": "All Stages"},
+        "year": {"0": "Latest 5-year average"},
+        "areatype": {"county": "By County", "state": "By State"},
+    }
+
+    with patch.object(scraper, "get_select_options", return_value=tiny_opts), \
+         patch.object(scraper, "get_table", side_effect=fake_get_table):
+        scraper.master_table(areatypes=("county", "state"))
+
+    assert captured_areatypes == ["county", "state"]
+
+
+def test_master_table_default_areatype_is_county_only():
+    """Backward-compat: default areatypes preserves county-only behaviour."""
+    captured_areatypes = []
+
+    def fake_get_table(**kwargs):
+        captured_areatypes.append(kwargs.get("areatype"))
+        import pandas as pd
+        return pd.DataFrame(
+            {
+                "county": ["Somewhere County, CO"],
+                "fips": ["08001"],
+                "age_adjusted_incidence_raterate_note___cases_per_100_000": [1.0],
+            }
+        )
+
+    tiny_opts = {
+        "cancer": {"001": "All Cancer Sites"},
+        "age": {"001": "All Ages"},
+        "sex": {"0": "Both Sexes"},
+        "race": {"00": "All Races (includes Hispanic)"},
+        "stage": {"999": "All Stages"},
+        "year": {"0": "Latest 5-year average"},
+        "areatype": {"county": "By County"},
+    }
+
+    with patch.object(scraper, "get_select_options", return_value=tiny_opts), \
+         patch.object(scraper, "get_table", side_effect=fake_get_table):
+        scraper.master_table()
+
+    assert set(captured_areatypes) == {"county"}
+
+
 def test_get_table_death_url():
     """get_table with _type='death' should use the deathrates endpoint."""
     captured_urls = []
