@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 import httpx
@@ -221,9 +221,40 @@ def get_demographics_table(
     return df
 
 
+def iter_demographics_combos(
+    options: dict[str, Any],
+    areatypes: Iterable[str],
+) -> Iterator[dict]:
+    """Yield every ``(areatype, topic, demo, race, sex, age)`` combo."""
+    topics = options["topic"]
+    demo_by_topic = options["demo_by_topic"]
+    races = options["race"]
+    sexes = options["sex"]
+    ages = options["age"]
+    for areatype in areatypes:
+        for topic_id in topics:
+            demos = demo_by_topic.get(topic_id, {})
+            if not demos:
+                continue
+            for demo_id in demos:
+                for race_id in races:
+                    for sex_id in sexes:
+                        for age_id in ages:
+                            yield {
+                                "topic": topic_id,
+                                "demo": demo_id,
+                                "areatype": areatype,
+                                "race": race_id,
+                                "sex": sex_id,
+                                "age": age_id,
+                            }
+
+
 def demographics_master_table(
     areatypes: Iterable[str] = ("county", "state"),
     options: dict[str, Any] | None = None,
+    combos: Iterable[dict] | None = None,
+    on_success: Callable[[dict, int], None] | None = None,
 ) -> pd.DataFrame:
     """Iterate over every ``(topic, demo, areatype, race, sex, age)`` combo.
 
@@ -233,50 +264,31 @@ def demographics_master_table(
         Defaults to ``("county", "state")``. The website also supports
         ``"hsa"`` (health service area) but it's omitted by default since
         HSA codes don't slot into FIPS-keyed downstream joins.
+    combos : iterable of dict, optional
+        Catalog-driven override of the cartesian iteration.
+    on_success : callable, optional
+        Called as ``on_success(combo, n_rows)`` after each successful fetch.
     """
     opts = options or get_demographics_options()
+
+    if combos is None:
+        logger.info(
+            "Demographics scrape: %d topics, areatypes=%s",
+            len(opts["topic"]), list(areatypes),
+        )
+        combos = iter_demographics_combos(opts, areatypes)
+
     dflist: list[pd.DataFrame] = []
-
-    topics = opts["topic"]
-    demo_by_topic = opts["demo_by_topic"]
-    races = opts["race"]
-    sexes = opts["sex"]
-    ages = opts["age"]
-
-    logger.info(
-        "Demographics scrape: %d topics, areatypes=%s",
-        len(topics), list(areatypes),
-    )
-
-    for areatype in areatypes:
-        for topic_id in topics:
-            demos = demo_by_topic.get(topic_id, {})
-            if not demos:
-                logger.debug("No demos defined for topic %s; skipping", topic_id)
-                continue
-            for demo_id in demos:
-                for race_id in races:
-                    for sex_id in sexes:
-                        for age_id in ages:
-                            try:
-                                df = get_demographics_table(
-                                    topic=topic_id,
-                                    demo=demo_id,
-                                    areatype=areatype,
-                                    race=race_id,
-                                    sex=sex_id,
-                                    age=age_id,
-                                    options=opts,
-                                )
-                                dflist.append(df)
-                            except KeyboardInterrupt:
-                                raise
-                            except Exception as exc:
-                                logger.debug(
-                                    "Skipped %s/%s area=%s race=%s sex=%s age=%s: %s",
-                                    topic_id, demo_id, areatype,
-                                    race_id, sex_id, age_id, exc,
-                                )
+    for combo in combos:
+        try:
+            df = get_demographics_table(options=opts, **combo)
+            dflist.append(df)
+            if on_success is not None:
+                on_success(combo, len(df))
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            logger.debug("Skipped %s: %s", combo, exc)
 
     if not dflist:
         return pd.DataFrame()

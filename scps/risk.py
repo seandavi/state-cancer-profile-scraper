@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 import httpx
@@ -196,56 +196,74 @@ def get_risk_table(
     return df
 
 
+def iter_risk_combos(
+    options: dict[str, Any],
+    statefipses: Iterable[str],
+) -> Iterator[dict]:
+    """Yield every ``(topic, risk, race, sex, statefips)`` combo."""
+    topics = options["topic"]
+    risk_by_topic = options["risk_by_topic"]
+    races = options["race"]
+    sexes = options["sex"]
+    for statefips in statefipses:
+        for topic_id in topics:
+            risks = risk_by_topic.get(topic_id, {})
+            if not risks:
+                continue
+            for risk_id in risks:
+                for race_id in races:
+                    for sex_id in sexes:
+                        yield {
+                            "topic": topic_id,
+                            "risk": risk_id,
+                            "race": race_id,
+                            "sex": sex_id,
+                            "statefips": statefips,
+                        }
+
+
 def risk_master_table(
     statefipses: Iterable[str] = ("00", "99"),
     options: dict[str, Any] | None = None,
+    combos: Iterable[dict] | None = None,
+    on_success: Callable[[dict, int], None] | None = None,
 ) -> pd.DataFrame:
     """Iterate over every ``(topic, risk, race, sex, statefips)`` combination.
 
     Parameters
     ----------
     statefipses : iterable of str
-        Which statefips queries to run. ``"00"`` returns the US-by-state
-        breakdown and ``"99"`` returns US-by-county. Defaults to both.
+        Which statefips queries to run when ``combos`` is not provided.
+        ``"00"`` returns the US-by-state breakdown and ``"99"`` returns
+        US-by-county. Defaults to both.
     options : dict, optional
         Pre-fetched output of ``get_risk_options()``. Refetched if omitted.
+    combos : iterable of dict, optional
+        If provided, supersedes the cartesian iteration — typically used by
+        the catalog to limit the run to known-good combos.
+    on_success : callable, optional
+        Called as ``on_success(combo, n_rows)`` after each successful fetch.
     """
     opts = options or get_risk_options()
+
+    if combos is None:
+        logger.info(
+            "Risk scrape: %d topics, statefips=%s",
+            len(opts["topic"]), list(statefipses),
+        )
+        combos = iter_risk_combos(opts, statefipses)
+
     dflist: list[pd.DataFrame] = []
-
-    topics = opts["topic"]
-    risk_by_topic = opts["risk_by_topic"]
-    races = opts["race"]
-    sexes = opts["sex"]
-
-    logger.info("Risk scrape: %d topics, statefips=%s", len(topics), list(statefipses))
-
-    for statefips in statefipses:
-        for topic_id in topics:
-            risks = risk_by_topic.get(topic_id, {})
-            if not risks:
-                logger.debug("No risks defined for topic %s; skipping", topic_id)
-                continue
-            for risk_id in risks:
-                for race_id in races:
-                    for sex_id in sexes:
-                        try:
-                            df = get_risk_table(
-                                topic=topic_id,
-                                risk=risk_id,
-                                race=race_id,
-                                sex=sex_id,
-                                statefips=statefips,
-                                options=opts,
-                            )
-                            dflist.append(df)
-                        except KeyboardInterrupt:
-                            raise
-                        except Exception as exc:
-                            logger.debug(
-                                "Skipped %s/%s race=%s sex=%s statefips=%s: %s",
-                                topic_id, risk_id, race_id, sex_id, statefips, exc,
-                            )
+    for combo in combos:
+        try:
+            df = get_risk_table(options=opts, **combo)
+            dflist.append(df)
+            if on_success is not None:
+                on_success(combo, len(df))
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            logger.debug("Skipped %s: %s", combo, exc)
 
     if not dflist:
         return pd.DataFrame()
