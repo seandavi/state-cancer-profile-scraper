@@ -4,6 +4,12 @@ Installed as the ``scps-scraper`` console script via ``pyproject.toml``::
 
     scps-scraper scrape                 # all datasets
     scps-scraper scrape --datasets risk # one dataset
+
+Catalog-driven runs::
+
+    scps-scraper scrape                          # uses ./scrape_catalog.jsonl if present
+    scps-scraper scrape --refresh-catalog        # full cartesian, rewrite catalog
+    scps-scraper scrape --catalog-path /tmp/c.jsonl
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ from pathlib import Path
 
 import click
 
+from scps import catalog as catalog_mod
 from scps import demographics, risk, scraper
 
 logger = logging.getLogger("scps.cli")
@@ -26,6 +33,8 @@ OUTPUT_FILES = {
     "risk": "state_cancer_profiles_risk.csv.gz",
     "demographics": "state_cancer_profiles_demographics.csv.gz",
 }
+
+DEFAULT_CATALOG_FILENAME = "scrape_catalog.jsonl"
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -69,64 +78,205 @@ def cli(log_level: str) -> None:
         "Defaults to ('county', 'state')."
     ),
 )
+@click.option(
+    "--catalog-path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        f"Path to the scrape catalog (default: <output-dir>/{DEFAULT_CATALOG_FILENAME}). "
+        "If the file exists and --refresh-catalog is not set, only the "
+        "combinations recorded in it will be re-fetched."
+    ),
+)
+@click.option(
+    "--refresh-catalog",
+    is_flag=True,
+    default=False,
+    help=(
+        "Ignore any existing catalog and run the full cartesian iteration, "
+        "rewriting the catalog from the surviving combinations. Use this on "
+        "a quarterly cadence (or after a known upstream schema change)."
+    ),
+)
 def scrape(
     datasets: tuple[str, ...],
     output_dir: Path,
     areatypes: tuple[str, ...],
+    catalog_path: Path | None,
+    refresh_catalog: bool,
 ) -> None:
     """Run the scraper and write gzipped CSVs to ``--output-dir``."""
     selected = tuple(d.lower() for d in datasets) or DATASET_CHOICES
     output_dir.mkdir(parents=True, exist_ok=True)
     areas = tuple(a.lower() for a in areatypes) or ("county", "state")
+    catalog_path = catalog_path or (output_dir / DEFAULT_CATALOG_FILENAME)
+
+    if refresh_catalog and catalog_path.exists():
+        logger.info("Refresh mode: truncating existing catalog at %s", catalog_path)
+        catalog_path.unlink()
+    catalog = catalog_mod.Catalog.load(catalog_path)
+    catalog_driven = not refresh_catalog and len(catalog.entries) > 0
+    if catalog_driven:
+        logger.info(
+            "Catalog-driven mode: %d entries loaded from %s",
+            len(catalog.entries), catalog_path,
+        )
+    else:
+        logger.info(
+            "Discovery mode: full cartesian iteration. Catalog will be (re)written at %s",
+            catalog_path,
+        )
 
     if "incidence" in selected or "mortality" in selected:
-        # Re-export the live select options alongside the data so anyone
-        # consuming the release can decode metadata IDs without re-scraping.
         logger.info("Fetching incidence/mortality select options")
         options_path = output_dir / "select_options.json"
         with options_path.open("w") as fh:
             json.dump(scraper.get_select_options(), fh)
 
+    risk_options = None
+    demo_options = None
+
     if "incidence" in selected:
-        _run_incidence_or_mortality("incd", areas, output_dir)
+        _run_incidence_or_mortality(
+            "incd", "incidence", areas, output_dir, catalog, catalog_driven
+        )
     if "mortality" in selected:
-        _run_incidence_or_mortality("death", areas, output_dir)
+        _run_incidence_or_mortality(
+            "death", "mortality", areas, output_dir, catalog, catalog_driven
+        )
     if "risk" in selected:
-        _run_risk(output_dir)
+        risk_options = _run_risk(output_dir, catalog, catalog_driven)
     if "demographics" in selected:
-        _run_demographics(areas, output_dir)
+        demo_options = _run_demographics(
+            areas, output_dir, catalog, catalog_driven
+        )
+
+    catalog.save()
+
+    if catalog_driven:
+        _probe_new_ids(catalog, selected, risk_options, demo_options)
 
 
 def _run_incidence_or_mortality(
-    type_code: str, areatypes: tuple[str, ...], output_dir: Path
+    type_code: str,
+    endpoint: str,
+    areatypes: tuple[str, ...],
+    output_dir: Path,
+    catalog: catalog_mod.Catalog,
+    catalog_driven: bool,
 ) -> None:
-    label = "incidence" if type_code == "incd" else "mortality"
-    logger.info("Scraping %s (areatypes=%s)", label, areatypes)
-    df = scraper.master_table(_type=type_code, areatypes=areatypes)
-    out = output_dir / OUTPUT_FILES[label]
+    logger.info("Scraping %s (areatypes=%s)", endpoint, areatypes)
+    combos = list(catalog.combos_for(endpoint)) if catalog_driven else None
+    if catalog_driven and not combos:
+        logger.warning(
+            "Catalog has no entries for %s; falling back to discovery", endpoint
+        )
+        combos = None
+    df = scraper.master_table(
+        _type=type_code,
+        areatypes=areatypes,
+        combos=combos,
+        on_success=catalog_mod.make_recorder(catalog, endpoint),
+    )
+    out = output_dir / OUTPUT_FILES[endpoint]
     logger.info("Writing %s (shape=%s)", out, df.shape)
     df.to_csv(out, index=False, compression="gzip")
 
 
-def _run_risk(output_dir: Path) -> None:
+def _run_risk(
+    output_dir: Path,
+    catalog: catalog_mod.Catalog,
+    catalog_driven: bool,
+) -> dict | None:
     logger.info("Scraping risk factors")
-    df = risk.risk_master_table()
+    options = risk.get_risk_options()
+    combos = list(catalog.combos_for("risk")) if catalog_driven else None
+    if catalog_driven and not combos:
+        logger.warning("Catalog has no entries for risk; falling back to discovery")
+        combos = None
+    df = risk.risk_master_table(
+        options=options,
+        combos=combos,
+        on_success=catalog_mod.make_recorder(catalog, "risk"),
+    )
     out = output_dir / OUTPUT_FILES["risk"]
     logger.info("Writing %s (shape=%s)", out, df.shape)
     df.to_csv(out, index=False, compression="gzip")
+    return options
 
 
-def _run_demographics(areatypes: tuple[str, ...], output_dir: Path) -> None:
-    # The demographics endpoint doesn't accept all the same areatypes as
-    # incidence/mortality; filter to those it supports.
+def _run_demographics(
+    areatypes: tuple[str, ...],
+    output_dir: Path,
+    catalog: catalog_mod.Catalog,
+    catalog_driven: bool,
+) -> dict | None:
     demo_areatypes = tuple(a for a in areatypes if a in ("county", "state", "hsa"))
     if not demo_areatypes:
         demo_areatypes = ("county", "state")
     logger.info("Scraping demographics (areatypes=%s)", demo_areatypes)
-    df = demographics.demographics_master_table(areatypes=demo_areatypes)
+    options = demographics.get_demographics_options()
+    combos = list(catalog.combos_for("demographics")) if catalog_driven else None
+    if catalog_driven and not combos:
+        logger.warning(
+            "Catalog has no entries for demographics; falling back to discovery"
+        )
+        combos = None
+    df = demographics.demographics_master_table(
+        areatypes=demo_areatypes,
+        options=options,
+        combos=combos,
+        on_success=catalog_mod.make_recorder(catalog, "demographics"),
+    )
     out = output_dir / OUTPUT_FILES["demographics"]
     logger.info("Writing %s (shape=%s)", out, df.shape)
     df.to_csv(out, index=False, compression="gzip")
+    return options
+
+
+def _probe_new_ids(
+    catalog: catalog_mod.Catalog,
+    selected: tuple[str, ...],
+    risk_options: dict | None,
+    demo_options: dict | None,
+) -> None:
+    """Warn if upstream has added new top-level IDs since the catalog was built."""
+    if ("incidence" in selected or "mortality" in selected):
+        live = scraper.get_select_options()
+        for endpoint in ("incidence", "mortality"):
+            if endpoint not in selected:
+                continue
+            new = catalog_mod.probe_new_ids(
+                catalog, endpoint, live["cancer"].keys(), "cancer"
+            )
+            if new:
+                logger.warning(
+                    "Upstream has %d new cancer IDs not in catalog (%s): %s. "
+                    "Consider re-running with --refresh-catalog.",
+                    len(new), endpoint, sorted(new),
+                )
+
+    if "risk" in selected and risk_options is not None:
+        new = catalog_mod.probe_new_ids(
+            catalog, "risk", risk_options["topic"].keys(), "topic"
+        )
+        if new:
+            logger.warning(
+                "Upstream has %d new risk topics not in catalog: %s. "
+                "Consider re-running with --refresh-catalog.",
+                len(new), sorted(new),
+            )
+
+    if "demographics" in selected and demo_options is not None:
+        new = catalog_mod.probe_new_ids(
+            catalog, "demographics", demo_options["topic"].keys(), "topic"
+        )
+        if new:
+            logger.warning(
+                "Upstream has %d new demographics topics not in catalog: %s. "
+                "Consider re-running with --refresh-catalog.",
+                len(new), sorted(new),
+            )
 
 
 if __name__ == "__main__":

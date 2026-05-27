@@ -1,5 +1,6 @@
 """Smoke tests for the click CLI."""
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,15 +10,30 @@ from click.testing import CliRunner
 from scps import cli
 
 
-def _fake_master_table(*_args, **_kwargs):
+def _fake_master_table(*_args, on_success=None, **_kwargs):
+    if on_success is not None:
+        on_success(
+            {"cancer": "001", "age": "001", "sex": "0", "race": "00", "stage": "999", "areatype": "county"},
+            1,
+        )
     return pd.DataFrame({"reported_locale": ["X"], "fips": ["00000"]})
 
 
-def _fake_risk_table(*_args, **_kwargs):
+def _fake_risk_table(*_args, on_success=None, **_kwargs):
+    if on_success is not None:
+        on_success(
+            {"topic": "alcohol", "risk": "v505", "race": "00", "sex": "0", "statefips": "00"},
+            1,
+        )
     return pd.DataFrame({"reported_locale": ["X"], "fips": ["00000"]})
 
 
-def _fake_demo_table(*_args, **_kwargs):
+def _fake_demo_table(*_args, on_success=None, **_kwargs):
+    if on_success is not None:
+        on_success(
+            {"topic": "crowd", "demo": "00027", "areatype": "county", "race": "00", "sex": "0", "age": "001"},
+            1,
+        )
     return pd.DataFrame({"reported_locale": ["X"], "area_code": ["00000"]})
 
 
@@ -65,6 +81,8 @@ def test_scrape_filters_by_dataset(tmp_path):
             side_effect=_fake_demo_table,
         ) as demo_mock,
         patch("scps.cli.scraper.get_select_options", return_value={"cancer": {}}),
+        patch("scps.cli.risk.get_risk_options", return_value={"topic": {}}),
+        patch("scps.cli.demographics.get_demographics_options", return_value={"topic": {}}),
     ):
         result = runner.invoke(
             cli.cli, ["scrape", "-d", "risk", "-o", str(tmp_path)]
@@ -75,3 +93,98 @@ def test_scrape_filters_by_dataset(tmp_path):
     demo_mock.assert_not_called()
     assert (tmp_path / "state_cancer_profiles_risk.csv.gz").exists()
     assert not (tmp_path / "state_cancer_profiles_incidence.csv.gz").exists()
+
+
+def test_scrape_writes_catalog_in_discovery_mode(tmp_path):
+    """First-run / no-catalog → write a fresh catalog from successful combos."""
+    runner = CliRunner()
+    with (
+        patch("scps.cli.scraper.master_table", side_effect=_fake_master_table),
+        patch("scps.cli.risk.risk_master_table", side_effect=_fake_risk_table),
+        patch(
+            "scps.cli.demographics.demographics_master_table",
+            side_effect=_fake_demo_table,
+        ),
+        patch("scps.cli.scraper.get_select_options", return_value={"cancer": {}}),
+        patch("scps.cli.risk.get_risk_options", return_value={"topic": {}}),
+        patch("scps.cli.demographics.get_demographics_options", return_value={"topic": {}}),
+    ):
+        result = runner.invoke(cli.cli, ["scrape", "-o", str(tmp_path)])
+
+    assert result.exit_code == 0, result.output
+    catalog_path = tmp_path / "scrape_catalog.jsonl"
+    assert catalog_path.exists()
+    lines = [json.loads(line) for line in catalog_path.read_text().splitlines() if line.strip()]
+    endpoints_seen = {entry["endpoint"] for entry in lines}
+    assert endpoints_seen == {"incidence", "mortality", "risk", "demographics"}
+
+
+def test_scrape_uses_catalog_when_present(tmp_path):
+    """Second run with a catalog passes combos through to master_table."""
+    runner = CliRunner()
+    catalog_path = tmp_path / "scrape_catalog.jsonl"
+    catalog_path.write_text(
+        json.dumps({
+            "endpoint": "risk",
+            "topic": "alcohol",
+            "risk": "v505",
+            "race": "00",
+            "sex": "0",
+            "statefips": "00",
+            "rows": 52,
+            "discovered": "2026-01-01",
+            "last_seen": "2026-01-01",
+        }) + "\n"
+    )
+
+    captured_combos = []
+
+    def capture(*_args, combos=None, on_success=None, **_kw):
+        captured_combos.append(list(combos) if combos is not None else None)
+        return pd.DataFrame({"reported_locale": ["X"], "fips": ["00000"]})
+
+    with (
+        patch("scps.cli.risk.risk_master_table", side_effect=capture),
+        patch("scps.cli.risk.get_risk_options", return_value={"topic": {}}),
+    ):
+        result = runner.invoke(
+            cli.cli, ["scrape", "-d", "risk", "-o", str(tmp_path)]
+        )
+
+    assert result.exit_code == 0, result.output
+    # combos were passed (not None) and contained the single catalog entry.
+    assert captured_combos == [
+        [{"topic": "alcohol", "risk": "v505", "race": "00", "sex": "0", "statefips": "00"}]
+    ]
+
+
+def test_refresh_catalog_truncates_existing(tmp_path):
+    catalog_path = tmp_path / "scrape_catalog.jsonl"
+    catalog_path.write_text(
+        json.dumps({"endpoint": "risk", "topic": "old", "risk": "v0", "rows": 1,
+                    "discovered": "2025-01-01", "last_seen": "2025-01-01"}) + "\n"
+    )
+
+    captured_combos = []
+
+    def capture(*_args, combos=None, on_success=None, **_kw):
+        captured_combos.append(combos)  # should be None in refresh mode
+        if on_success:
+            on_success({"topic": "new", "risk": "v1"}, 5)
+        return pd.DataFrame({"reported_locale": ["X"], "fips": ["00000"]})
+
+    runner = CliRunner()
+    with (
+        patch("scps.cli.risk.risk_master_table", side_effect=capture),
+        patch("scps.cli.risk.get_risk_options", return_value={"topic": {}}),
+    ):
+        result = runner.invoke(
+            cli.cli, ["scrape", "-d", "risk", "-o", str(tmp_path), "--refresh-catalog"]
+        )
+
+    assert result.exit_code == 0, result.output
+    assert captured_combos == [None]  # discovery mode, no combo filter
+    # The old "old/v0" entry is gone; only the new "new/v1" remains.
+    lines = [json.loads(line) for line in catalog_path.read_text().splitlines() if line.strip()]
+    topics_in_catalog = {entry["topic"] for entry in lines}
+    assert topics_in_catalog == {"new"}

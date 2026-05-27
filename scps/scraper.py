@@ -26,7 +26,7 @@ options are not valid for some of the other options.
 
 """
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Iterator
 
 import httpx
 import pandas as pd
@@ -169,79 +169,80 @@ def get_table(
     return df[df[rate_col].notna()]
 
 
-# This function uses argparse to collect the command line arguments
-# and then calls get_table() with those arguments.
-# use last five years of data (year=0), all states (stateFIPS=00)
+def iter_incidence_combos(
+    select_options: dict,
+    areatypes: Iterable[str],
+) -> Iterator[dict]:
+    """Yield every ``(cancer × age × sex × race × stage × areatype)`` combo.
+
+    Pediatric cancers 515 and 516 use restricted age ranges per the
+    upstream site's javascript; that constraint is encoded here.
+    """
+    cancers = list(select_options["cancer"].keys())
+    for areatype in areatypes:
+        for cancer in cancers:
+            if cancer == "516":
+                ages: Iterable[str] = ["016"]
+            elif cancer == "515":
+                ages = ["015"]
+            else:
+                ages = list(select_options["age"].keys())
+            for age in ages:
+                for sex in select_options["sex"].keys():
+                    for race in select_options["race"].keys():
+                        for stage in select_options["stage"].keys():
+                            yield {
+                                "cancer": cancer,
+                                "age": age,
+                                "sex": sex,
+                                "race": race,
+                                "stage": stage,
+                                "areatype": areatype,
+                            }
+
+
 def master_table(
     year: str = "0",
     stateFIPS: str = "00",
     _type: str = "incd",
     areatypes: Iterable[str] = ("county",),
+    combos: Iterable[dict] | None = None,
+    on_success: Callable[[dict, int], None] | None = None,
 ):
     """Scrape every (cancer × age × sex × race × stage × areatype) combination.
 
     Parameters
     ----------
     areatypes : iterable of str
-        One or more areatype values to iterate. The website supports
-        ``"county"``, ``"state"``, and ``"hsa"`` (health service area).
-        Defaults to ``("county",)`` for backward compatibility with the
-        single-areatype behaviour of earlier releases. Pass
-        ``("county", "state")`` (the new default in ``main``) to capture
-        state-level rollups — including the national row at FIPS ``00000`` —
-        in the same output frame.
+        Areatypes to iterate when ``combos`` is not provided. The website
+        supports ``"county"``, ``"state"``, and ``"hsa"`` (health service
+        area). Defaults to ``("county",)`` for backward compatibility.
+    combos : iterable of dict, optional
+        If provided, supersedes the cartesian iteration — typically used by
+        the catalog to limit the run to known-good combos. Each dict's keys
+        become ``get_table`` kwargs.
+    on_success : callable, optional
+        Called as ``on_success(combo, n_rows)`` after every successful
+        fetch. The catalog uses this to record discoveries incrementally.
     """
-    select_options = get_select_options()
-    logger.info(str(select_options))
-    dflist = []
-    cancers = list(select_options["cancer"].keys())
-    logger.info(f"Number of cancers: {len(cancers)}")
-    for areatype in areatypes:
-        logger.info(f"Getting data for areatype: {areatype}")
-        for cancer in cancers:
-            cancer_name = select_options["cancer"][cancer]
-            logger.info(
-                f"Getting data for cancer: {cancer_name} (areatype={areatype})"
-            )
+    if combos is None:
+        select_options = get_select_options()
+        cancers = list(select_options["cancer"].keys())
+        logger.info(f"Number of cancers: {len(cancers)}")
+        combos = iter_incidence_combos(select_options, areatypes)
 
-            # The state cancer profiles folks in their
-            # decided to make the age
-            # groups for cancer 515 and 516 (pediatrics) different
-            # than the other cancers. So we have to
-            # handle them separately.
-            if cancer == "516":
-                ages = ["016"]
-            elif cancer == "515":
-                ages = ["015"]
-            else:
-                ages = select_options["age"].keys()
-            for age in ages:
-                for sex in select_options["sex"].keys():
-                    for race in select_options["race"].keys():
-                        for stage in select_options["stage"].keys():
-                            try:
-                                df = get_table(
-                                    cancer=cancer,
-                                    age=age,
-                                    sex=sex,
-                                    race=race,
-                                    stage=stage,
-                                    areatype=areatype,
-                                    _type=_type,
-                                )
-                                logger.debug(
-                                    f"Got data for {cancer_name} "
-                                    f"(areatype={areatype}), shape {df.shape}"
-                                )
-                                dflist.append(df)
-                            except KeyboardInterrupt:
-                                raise
-                            except Exception as e:
-                                logger.debug(
-                                    "Caught an exception, but ignoring it"
-                                )
-                                logger.debug(e)
-                                pass
+    dflist = []
+    for combo in combos:
+        try:
+            df = get_table(_type=_type, **combo)
+            dflist.append(df)
+            if on_success is not None:
+                on_success(combo, len(df))
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            logger.debug("Caught an exception, but ignoring it")
+            logger.debug(e)
     df = pd.concat(dflist)
     df[["locale", "state"]] = df.county.str.replace(
         r"\(.*\)", "", regex=True

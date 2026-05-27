@@ -153,6 +153,31 @@ python -m scps.scraper
 
 The scraper writes gzipped CSVs to the current working directory (or `--output-dir`).
 
+### Scrape catalog
+
+Each release ships a `scrape_catalog.jsonl` artifact alongside the CSVs. It
+records which `(endpoint, dimension-combo)` tuples returned non-empty data,
+so subsequent runs can skip the ~70-80% of the cartesian space that is
+suppressed or invalid (cervical cancer for males, pediatric cancers at adult
+ages, BRFSS small-cell suppression, etc.).
+
+```bash
+# Use ./scrape_catalog.jsonl if it exists (skip empty combos)
+scps-scraper scrape
+
+# Force full cartesian re-discovery and rewrite the catalog
+scps-scraper scrape --refresh-catalog
+
+# Point at a different catalog file
+scps-scraper scrape --catalog-path /path/to/catalog.jsonl
+```
+
+CI does a full refresh quarterly (January, April, July, October) and uses
+the previous release's catalog the other eight months. After a
+catalog-driven run, the scraper probes the live select options and warns if
+upstream has added a new cancer / topic / risk / demo that the catalog
+doesn't know about.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

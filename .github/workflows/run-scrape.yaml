@@ -27,8 +27,36 @@ jobs:
     - name: Install dependencies
       run: uv sync --frozen
 
+    - name: Fetch previous release's catalog (if any)
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Pull the latest release's catalog so this run can skip combinations
+        # that returned no data last time. First release (or missing artifact)
+        # falls through silently and the scrape runs in discovery mode.
+        gh release download --pattern 'scrape_catalog.jsonl' \
+          --repo ${{ github.repository }} \
+          || echo "No previous catalog found — will run in discovery mode."
+
+    - name: Decide refresh-catalog cadence
+      id: refresh
+      run: |
+        # Force a full-cartesian re-discovery quarterly (Jan/Apr/Jul/Oct) so
+        # newly-uncensored cells and upstream-added IDs are picked up.
+        month=$(date +%m)
+        case "$month" in
+          01|04|07|10)
+            echo "flag=--refresh-catalog" >> "$GITHUB_OUTPUT"
+            echo "Quarterly month ($month) — refreshing catalog from scratch."
+            ;;
+          *)
+            echo "flag=" >> "$GITHUB_OUTPUT"
+            echo "Non-quarterly month ($month) — using existing catalog."
+            ;;
+        esac
+
     - name: Run scrape
-      run: uv run scps-scraper scrape
+      run: uv run scps-scraper scrape ${{ steps.refresh.outputs.flag }}
 
     - name: Tag with gh_hash
       run: echo ${{ github.sha }} > gh_hash.txt
@@ -57,3 +85,4 @@ jobs:
           state_cancer_profiles_risk.csv.gz
           state_cancer_profiles_demographics.csv.gz
           select_options.json
+          scrape_catalog.jsonl
