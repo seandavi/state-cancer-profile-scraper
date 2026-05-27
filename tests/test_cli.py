@@ -188,3 +188,42 @@ def test_refresh_catalog_truncates_existing(tmp_path):
     lines = [json.loads(line) for line in catalog_path.read_text().splitlines() if line.strip()]
     topics_in_catalog = {entry["topic"] for entry in lines}
     assert topics_in_catalog == {"new"}
+
+
+def test_refresh_preserves_other_endpoints_entries(tmp_path):
+    """Refreshing only `risk` must not drop incidence/mortality/demographics."""
+    catalog_path = tmp_path / "scrape_catalog.jsonl"
+    catalog_path.write_text(
+        "\n".join([
+            json.dumps({"endpoint": "risk", "topic": "old", "risk": "v0", "rows": 1,
+                        "discovered": "2025-01-01", "last_seen": "2025-01-01"}),
+            json.dumps({"endpoint": "incidence", "cancer": "001", "age": "001",
+                        "sex": "0", "race": "00", "stage": "999", "areatype": "county",
+                        "rows": 3142, "discovered": "2025-01-01", "last_seen": "2025-01-01"}),
+            json.dumps({"endpoint": "demographics", "topic": "crowd", "demo": "00027",
+                        "areatype": "county", "race": "00", "sex": "0", "age": "001",
+                        "rows": 3143, "discovered": "2025-01-01", "last_seen": "2025-01-01"}),
+        ]) + "\n"
+    )
+
+    def fake_risk(*_args, on_success=None, **_kw):
+        if on_success:
+            on_success({"topic": "new", "risk": "v1", "race": "00", "sex": "0", "statefips": "00"}, 5)
+        return pd.DataFrame({"reported_locale": ["X"], "fips": ["00000"]})
+
+    runner = CliRunner()
+    with (
+        patch("scps.cli.risk.risk_master_table", side_effect=fake_risk),
+        patch("scps.cli.risk.get_risk_options", return_value={"topic": {}}),
+    ):
+        result = runner.invoke(
+            cli.cli, ["scrape", "-d", "risk", "-o", str(tmp_path), "--refresh-catalog"]
+        )
+
+    assert result.exit_code == 0, result.output
+    lines = [json.loads(line) for line in catalog_path.read_text().splitlines() if line.strip()]
+    by_endpoint = {entry["endpoint"]: entry for entry in lines}
+    # risk entry replaced (old → new), incidence + demographics preserved.
+    assert by_endpoint["risk"]["topic"] == "new"
+    assert by_endpoint["incidence"]["cancer"] == "001"
+    assert by_endpoint["demographics"]["topic"] == "crowd"

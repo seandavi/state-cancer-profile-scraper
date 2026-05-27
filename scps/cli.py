@@ -111,10 +111,22 @@ def scrape(
     areas = tuple(a.lower() for a in areatypes) or ("county", "state")
     catalog_path = catalog_path or (output_dir / DEFAULT_CATALOG_FILENAME)
 
-    if refresh_catalog and catalog_path.exists():
-        logger.info("Refresh mode: truncating existing catalog at %s", catalog_path)
-        catalog_path.unlink()
     catalog = catalog_mod.Catalog.load(catalog_path)
+    if refresh_catalog:
+        # Refresh only the *selected* endpoints' entries — preserve others so a
+        # targeted refresh (e.g. -d risk --refresh-catalog) doesn't wipe the
+        # full-cartesian discoveries for the datasets we're not touching.
+        before = len(catalog.entries)
+        catalog.entries = [e for e in catalog.entries if e.endpoint not in selected]
+        removed = before - len(catalog.entries)
+        if removed:
+            logger.info(
+                "Refresh mode: dropped %d existing entries for %s; preserving the rest.",
+                removed, list(selected),
+            )
+        # Rewrite the on-disk file from the preserved entries so subsequent
+        # per-success append_disk() calls don't double up.
+        catalog.save()
     catalog_driven = not refresh_catalog and len(catalog.entries) > 0
     if catalog_driven:
         logger.info(
