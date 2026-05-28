@@ -100,7 +100,7 @@ def test_master_table_uses_combo_iterator_and_calls_on_success(tmp_path):
 
     def fake_get_table(**kwargs):
         seen_combos.append(kwargs)
-        return pd.DataFrame({"county": ["X, CO"], "fips": ["08001"]})
+        return pd.DataFrame({"reported_locale": ["X, CO"], "fips": ["08001"]})
 
     combos = [
         {"cancer": "001", "age": "001", "sex": "0", "race": "00", "stage": "999", "areatype": "county"},

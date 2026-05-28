@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from scps import scraper
@@ -162,9 +163,11 @@ def test_master_table_iterates_areatypes():
         import pandas as pd
         # master_table splits `county` on ", " into (locale, state) — use a
         # comma-bearing string so the split produces two columns.
+        # master_table now expects `reported_locale` (get_table renames the
+        # raw "county"/"state" column to this); replicate that here.
         return pd.DataFrame(
             {
-                "county": ["Somewhere County, CO"],
+                "reported_locale": ["Somewhere County, CO"],
                 "fips": ["08001"],
                 "age_adjusted_incidence_raterate_note___cases_per_100_000": [1.0],
             }
@@ -195,9 +198,11 @@ def test_master_table_default_areatype_is_county_only():
     def fake_get_table(**kwargs):
         captured_areatypes.append(kwargs.get("areatype"))
         import pandas as pd
+        # master_table now expects `reported_locale` (get_table renames the
+        # raw "county"/"state" column to this); replicate that here.
         return pd.DataFrame(
             {
-                "county": ["Somewhere County, CO"],
+                "reported_locale": ["Somewhere County, CO"],
                 "fips": ["08001"],
                 "age_adjusted_incidence_raterate_note___cases_per_100_000": [1.0],
             }
@@ -218,6 +223,87 @@ def test_master_table_default_areatype_is_county_only():
         scraper.master_table()
 
     assert set(captured_areatypes) == {"county"}
+
+
+def test_get_table_handles_state_areatype_response():
+    """By-state responses have `State`+`FIPS` columns, not `County`+`FIPS`.
+
+    Regression for the bug where state-areatype combos silently failed because
+    df["county"] raised KeyError and master_table swallowed it.
+    """
+    state_csv = pd.DataFrame(
+        {
+            "state": [
+                "California",
+                "Texas",
+                "District of Columbia",  # 11001 — 5-char non-000 FIPS, still state
+                "Alaska",                # 02900 — aggregated registry, special FIPS
+            ],
+            "fips": ["06000", "48000", "11001", "02900"],
+            "age_adjusted_incidence_raterate_note___cases_per_100_000": [
+                400.0, 410.0, 420.0, 430.0,
+            ],
+            "lower_95pct_confidence_interval": [395.0, 405.0, 415.0, 425.0],
+            "upper_95pct_confidence_interval": [405.0, 415.0, 425.0, 435.0],
+            "ci_rankrank_note": ["1", "2", "3", "4"],
+            "lower_ci_ci_rank": [1, 2, 3, 4],
+            "upper_ci_ci_rank": [3, 4, 5, 6],
+            "average_annual_count": [100000, 90000, 5000, 3000],
+            "recent_trend": ["stable"] * 4,
+            "recent_5_year_trend_trend_note_in_incidence_rates": [0.1, 0.2, 0.0, -0.1],
+            "lower_95pct_confidence_interval_1": [0.0, 0.1, -0.1, -0.2],
+            "upper_95pct_confidence_interval_1": [0.2, 0.3, 0.1, 0.0],
+        }
+    )
+
+    with patch("pandas.read_csv", return_value=state_csv):
+        df = scraper.get_table(areatype="state")
+
+    assert "reported_locale" in df.columns
+    assert "county" not in df.columns
+    assert "state" not in df.columns  # the source column got renamed
+    # Every row in the by-state view classifies as "state", including the
+    # 5-char-non-000 FIPS rows for DC and the Alaska aggregate.
+    assert (df["locale_type"] == "state").all()
+
+
+def test_get_table_locale_type_from_fips_shape():
+    """For by-county runs, classification uses FIPS shape — not locale-string.
+
+    Regression for county-equivalents (parishes, boroughs, independent cities)
+    that don't have the word "County" in their name. Also verifies that a
+    state-aggregate row (FIPS XX000) embedded in a county-view response is
+    labeled "state".
+    """
+    mixed_csv = pd.DataFrame(
+        {
+            "county": [
+                "United States",                  # 00000 → national
+                "California",                     # 06000 → state aggregate row
+                "Iberville Parish, Louisiana",    # 22047 → county-equivalent
+                "Lake and Peninsula Borough, AK", # 02164 → county-equivalent
+                "Galax City, Virginia",           # 51640 → county-equivalent (city)
+                "Plain County, Anywhere",         # 12345 → traditional county
+            ],
+            "fips": ["00000", "06000", "22047", "02164", "51640", "12345"],
+            "age_adjusted_incidence_raterate_note___cases_per_100_000": [
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0
+            ],
+        }
+    )
+
+    with patch("pandas.read_csv", return_value=mixed_csv):
+        df = scraper.get_table(areatype="county")
+
+    by_fips = dict(zip(df["fips"], df["locale_type"]))
+    assert by_fips == {
+        "00000": "national",
+        "06000": "state",
+        "22047": "county",
+        "02164": "county",
+        "51640": "county",
+        "12345": "county",
+    }
 
 
 def test_get_table_death_url():

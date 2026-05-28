@@ -126,6 +126,17 @@ def get_table(
     )
     df.columns = [column_text_replace(c) for c in df.columns]
 
+    # Upstream uses different locale-column headers per areatype: "County"
+    # for by-county, "State" for by-state. Normalize to `reported_locale`
+    # here so downstream code (and the later locale_type derivation) doesn't
+    # KeyError on whichever flavor it didn't expect. Pre-fix, the by-state
+    # branch raised and the master_table try/except swallowed every state
+    # combo silently — see #11 follow-up.
+    if "county" in df.columns:
+        df = df.rename(columns={"county": "reported_locale"})
+    elif "state" in df.columns:
+        df = df.rename(columns={"state": "reported_locale"})
+
     def get_text_from_select_id(group, id):
         return select_opts[group][id]
 
@@ -136,16 +147,37 @@ def get_table(
     df["cancer"] = get_text_from_select_id("cancer", cancer)
     df["areatype"] = get_text_from_select_id("areatype", areatype)
     df["age"] = get_text_from_select_id("age", age)
+    df.loc[df["fips"].isna(), "fips"] = ""
     df["state_fips"] = df["fips"].str[:2]
     if _type == "incd":
         df["measurement"] = "incidence"
     else:
         df["measurement"] = "mortality"
+    # locale_type derivation. The request `areatype` tells us which view of
+    # the data the row came from, which is the source of truth for whether a
+    # row is state-level or county-level. FIPS shape alone would mis-label
+    # corner cases — DC (11001), Puerto Rico (72001), and the Alaska
+    # aggregate (02900) come back from the by-state view with 5-char FIPS
+    # that don't end in 000. So:
+    #   - any row whose FIPS starts with "00" is the national aggregate;
+    #   - otherwise the request areatype dictates state vs county.
+    # For county-areatype runs, FIPS-shape still distinguishes the embedded
+    # state-aggregate row (e.g. 06000) when one shows up.
     df["locale_type"] = "other"
-    df.loc[df["fips"].isna(), "fips"] = ""
-    df.loc[df["fips"].str.endswith("000"), "locale_type"] = "state"
-    df.loc[df["fips"].str.startswith("00"), "locale_type"] = "national"
-    df.loc[df["county"].str.contains("County"), "locale_type"] = "county"
+    is_5char = df["fips"].str.len().eq(5)
+    is_national = is_5char & df["fips"].str.startswith("00")
+    df.loc[is_national, "locale_type"] = "national"
+    if areatype == "state":
+        df.loc[is_5char & ~is_national, "locale_type"] = "state"
+    elif areatype == "county":
+        df.loc[
+            is_5char & ~is_national & df["fips"].str.endswith("000"),
+            "locale_type",
+        ] = "state"
+        df.loc[
+            is_5char & ~is_national & ~df["fips"].str.endswith("000"),
+            "locale_type",
+        ] = "county"
     df["_extracted_at"] = pd.Timestamp.now().isoformat()
     # to allow for easy linkout to the website
     df["url"] = url.replace("&output=1", "")
@@ -244,14 +276,16 @@ def master_table(
             logger.debug("Caught an exception, but ignoring it")
             logger.debug(e)
     df = pd.concat(dflist)
-    df[["locale", "state"]] = df.county.str.replace(
+    # Split "Galax City, Virginia(2)" → ("Galax City", "Virginia") for county
+    # rows. State-level rows have no comma (e.g. "California") and split into
+    # ("California", None), which is the right shape.
+    df[["locale", "state"]] = df.reported_locale.str.replace(
         r"\(.*\)", "", regex=True
     ).str.split(", ", expand=True, n=1)
     if _type == "incd":
         column_translation = {
             "lower_95pct_confidence_interval_1": "lower_ci_trend_in_rate",
             "upper_95pct_confidence_interval_1": "upper_ci_trend_in_rate",
-            "county": "reported_locale",
             "age_adjusted_incidence_raterate_note___cases_per_100_000": "age_adjusted_rate_per_100_000",
             "ci_rankrank_note": "ci_rank",
             "lower_ci_ci_rank": "lower_ci_rank",
@@ -262,7 +296,6 @@ def master_table(
         }
     if _type == "death":
         column_translation = {
-            "county": "reported_locale",
             "age_adjusted_death_raterate_note___deaths_per_100_000": "age_adjusted_rate_per_100_000",
             "ci_rankrank_note": "ci_rank",
             "lower_ci_ci_rank": "lower_ci_rank",
