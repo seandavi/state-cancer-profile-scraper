@@ -5,6 +5,11 @@ on:
     - cron: '0 0 1 * *' # Runs at 00:00 UTC on the 1st day of every month
 
   workflow_dispatch:
+    inputs:
+      refresh_catalog:
+        description: 'Force full-cartesian re-discovery (ignore existing catalog)'
+        type: boolean
+        default: false
   # run on a tag with a push only
   push:
     tags:
@@ -41,19 +46,27 @@ jobs:
     - name: Decide refresh-catalog cadence
       id: refresh
       run: |
-        # Force a full-cartesian re-discovery quarterly (Jan/Apr/Jul/Oct) so
-        # newly-uncensored cells and upstream-added IDs are picked up.
-        month=$(date +%m)
-        case "$month" in
-          01|04|07|10)
-            echo "flag=--refresh-catalog" >> "$GITHUB_OUTPUT"
-            echo "Quarterly month ($month) — refreshing catalog from scratch."
-            ;;
-          *)
-            echo "flag=" >> "$GITHUB_OUTPUT"
-            echo "Non-quarterly month ($month) — using existing catalog."
-            ;;
-        esac
+        # Refresh the catalog when either:
+        #   (a) a workflow_dispatch run was launched with refresh_catalog=true
+        #       (for ad-hoc forced refreshes mid-quarter), or
+        #   (b) the scheduled run lands in a quarterly month (Jan/Apr/Jul/Oct)
+        #       so newly-uncensored cells and upstream-added IDs get picked up.
+        if [ "${{ github.event.inputs.refresh_catalog }}" = "true" ]; then
+          echo "flag=--refresh-catalog" >> "$GITHUB_OUTPUT"
+          echo "Manual --refresh-catalog requested via workflow_dispatch input."
+        else
+          month=$(date +%m)
+          case "$month" in
+            01|04|07|10)
+              echo "flag=--refresh-catalog" >> "$GITHUB_OUTPUT"
+              echo "Quarterly month ($month) — refreshing catalog from scratch."
+              ;;
+            *)
+              echo "flag=" >> "$GITHUB_OUTPUT"
+              echo "Non-quarterly month ($month) — using existing catalog."
+              ;;
+          esac
+        fi
 
     - name: Run scrape
       run: uv run scps-scraper scrape ${{ steps.refresh.outputs.flag }}
