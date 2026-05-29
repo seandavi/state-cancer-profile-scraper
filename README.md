@@ -79,7 +79,7 @@ Note that R, python, and many other languages can read CSV files directly withou
 
 ### Data access in place
 
-For those who simply want to query the data in place, both [duckdb](https://duckdb.org/) and [clickhouse](https://clickhouse.tech/) databases can query csv files directly.  For example, using duckdb, you can run the following code to query the data:
+For those who simply want to query the data in place, both [duckdb](https://duckdb.org/) and [clickhouse](https://clickhouse.tech/) databases can query remote csv files directly.  The same is true for R and Python. For example, using duckdb, you can run the following code to query the data:
 
 ```
 install httpfs;
