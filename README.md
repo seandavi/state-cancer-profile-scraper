@@ -51,11 +51,29 @@ The data is extracted from the [State Cancer Profiles](https://statecancerprofil
 
 ## Using the data
 
-The data is saved in two CSV files: one for cancer incidence and one for cancer mortality. The data is saved in a long format, with each row representing a single observation (i.e., a single cancer type in a single state in a single year). 
+The data is saved in four gzipped CSV files: one each for cancer incidence, cancer mortality, demographic summary stats, and risk factor summary stats. The data is saved in a long format, with each row representing a single observation (i.e., a single cancer type in a single state in a single year). 
 
 ### Download the data
 
-The data are available for download from the [releases](https://github.com/seandavi/state-cancer-profile-scraper/releases) page, with a link to the latest release [here](https://github.com/seandavi/state-cancer-profile-scraper/releases/latest).
+The data are available for download from the [releases](https://github.com/seandavi/state-cancer-profile-scraper/releases) page, with a link to the latest release [here](https://github.com/seandavi/state-cancer-profile-scraper/releases/latest). To grab the latest release files programmatically, utilize the `gh` command line client:
+
+```bash
+gh release download -p "*" -D gh_latest -R seandavi/state-cancer-profile-scraper
+```
+
+Which will give you:
+
+```bash
+gh_latest
+├── gh_hash.txt
+├── scrape_catalog.jsonl
+├── select_options.json
+├── state_cancer_profiles_demographics.csv.gz
+├── state_cancer_profiles_incidence.csv.gz
+├── state_cancer_profiles_mortality.csv.gz
+└── state_cancer_profiles_risk.csv.gz
+```
+
 
 Note that R, python, and many other languages can read CSV files directly without the need for downloading the data which might a fast and easy way to access the data. 
 
