@@ -54,6 +54,8 @@ def test_scrape_writes_each_dataset(tmp_path):
             side_effect=_fake_demo_table,
         ),
         patch("scps.cli.scraper.get_select_options", return_value={"cancer": {}}),
+        patch("scps.cli.risk.get_risk_options", return_value={"topic": {}}),
+        patch("scps.cli.demographics.get_demographics_options", return_value={"topic": {}}),
     ):
         result = runner.invoke(
             cli.cli, ["scrape", "-o", str(tmp_path)]
@@ -65,6 +67,10 @@ def test_scrape_writes_each_dataset(tmp_path):
         "state_cancer_profiles_mortality.csv.gz",
         "state_cancer_profiles_risk.csv.gz",
         "state_cancer_profiles_demographics.csv.gz",
+        "state_cancer_profiles_incidence.parquet",
+        "state_cancer_profiles_mortality.parquet",
+        "state_cancer_profiles_risk.parquet",
+        "state_cancer_profiles_demographics.parquet",
         "select_options.json",
     }
     written = {p.name for p in tmp_path.iterdir()}

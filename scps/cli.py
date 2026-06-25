@@ -34,6 +34,13 @@ OUTPUT_FILES = {
     "demographics": "state_cancer_profiles_demographics.csv.gz",
 }
 
+PARQUET_FILES = {
+    "incidence": "state_cancer_profiles_incidence.parquet",
+    "mortality": "state_cancer_profiles_mortality.parquet",
+    "risk": "state_cancer_profiles_risk.parquet",
+    "demographics": "state_cancer_profiles_demographics.parquet",
+}
+
 DEFAULT_CATALOG_FILENAME = "scrape_catalog.jsonl"
 
 
@@ -193,6 +200,9 @@ def _run_incidence_or_mortality(
     out = output_dir / OUTPUT_FILES[endpoint]
     logger.info("Writing %s (shape=%s)", out, df.shape)
     df.to_csv(out, index=False, compression="gzip")
+    parquet_out = output_dir / PARQUET_FILES[endpoint]
+    logger.info("Writing %s", parquet_out)
+    df.to_parquet(parquet_out, index=False)
 
 
 def _run_risk(
@@ -214,6 +224,9 @@ def _run_risk(
     out = output_dir / OUTPUT_FILES["risk"]
     logger.info("Writing %s (shape=%s)", out, df.shape)
     df.to_csv(out, index=False, compression="gzip")
+    parquet_out = output_dir / PARQUET_FILES["risk"]
+    logger.info("Writing %s", parquet_out)
+    df.to_parquet(parquet_out, index=False)
     return options
 
 
@@ -243,6 +256,9 @@ def _run_demographics(
     out = output_dir / OUTPUT_FILES["demographics"]
     logger.info("Writing %s (shape=%s)", out, df.shape)
     df.to_csv(out, index=False, compression="gzip")
+    parquet_out = output_dir / PARQUET_FILES["demographics"]
+    logger.info("Writing %s", parquet_out)
+    df.to_parquet(parquet_out, index=False)
     return options
 
 
