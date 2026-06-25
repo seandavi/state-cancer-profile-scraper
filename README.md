@@ -7,12 +7,12 @@
 
 The [state cancer profiles website](https://statecancerprofiles.cancer.gov/) hosts visualization and data exploration tools for cancer incidence and mortality in the United States. For casual browsing, the website is great. However, if having access to the underlying data is the goal, the existing site does not have bulk downloads or an API. Therefore, **we provide bulk data scraped from the website for data science applications**.
 
-Each release ships four gzipped CSVs:
+Each release ships four gzipped CSVs and four Parquet files (same data, two formats):
 
-- `state_cancer_profiles_incidence.csv.gz` — age-adjusted incidence rates (by cancer, age, sex, race, stage)
-- `state_cancer_profiles_mortality.csv.gz` — age-adjusted mortality rates (same dimensions)
-- `state_cancer_profiles_risk.csv.gz` — BRFSS-derived screening and risk-factor prevalence (alcohol, smoking, mammograms, colonoscopy, HPV vaccination, etc.)
-- `state_cancer_profiles_demographics.csv.gz` — ACS-derived demographics (crowding, education, poverty, SVI, etc.)
+- `state_cancer_profiles_incidence.csv.gz` / `state_cancer_profiles_incidence.parquet` — age-adjusted incidence rates (by cancer, age, sex, race, stage)
+- `state_cancer_profiles_mortality.csv.gz` / `state_cancer_profiles_mortality.parquet` — age-adjusted mortality rates (same dimensions)
+- `state_cancer_profiles_risk.csv.gz` / `state_cancer_profiles_risk.parquet` — BRFSS-derived screening and risk-factor prevalence (alcohol, smoking, mammograms, colonoscopy, HPV vaccination, etc.)
+- `state_cancer_profiles_demographics.csv.gz` / `state_cancer_profiles_demographics.parquet` — ACS-derived demographics (crowding, education, poverty, SVI, etc.)
 
 All four files cover both county-level and state-level rows in the same file (plus the national row at FIPS `00000`), distinguished by the `locale_type` column.
 
@@ -49,7 +49,7 @@ The data is extracted from the [State Cancer Profiles](https://statecancerprofil
 
 ## Using the data
 
-The data is saved in four gzipped CSV files: one each for cancer incidence, cancer mortality, demographic summary stats, and risk factor summary stats. The data is saved in a long format, with each row representing a single observation (i.e., a single cancer type in a single state in a single year). 
+The data is saved in four gzipped CSV files and four Parquet files: one each for cancer incidence, cancer mortality, demographic summary stats, and risk factor summary stats. The data is saved in a long format, with each row representing a single observation (i.e., a single cancer type in a single state in a single year).
 
 ### Download the data
 
@@ -67,9 +67,13 @@ gh_latest
 ├── scrape_catalog.jsonl
 ├── select_options.json
 ├── state_cancer_profiles_demographics.csv.gz
+├── state_cancer_profiles_demographics.parquet
 ├── state_cancer_profiles_incidence.csv.gz
+├── state_cancer_profiles_incidence.parquet
 ├── state_cancer_profiles_mortality.csv.gz
-└── state_cancer_profiles_risk.csv.gz
+├── state_cancer_profiles_mortality.parquet
+├── state_cancer_profiles_risk.csv.gz
+└── state_cancer_profiles_risk.parquet
 ```
 
 
@@ -167,7 +171,7 @@ The legacy module invocation is preserved and produces the same outputs:
 python -m scps.scraper
 ```
 
-The scraper writes gzipped CSVs to the current working directory (or `--output-dir`).
+The scraper writes gzipped CSVs and Parquet files to the current working directory (or `--output-dir`).
 
 ### Scrape catalog
 

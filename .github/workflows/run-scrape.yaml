@@ -97,5 +97,9 @@ jobs:
           state_cancer_profiles_mortality.csv.gz
           state_cancer_profiles_risk.csv.gz
           state_cancer_profiles_demographics.csv.gz
+          state_cancer_profiles_incidence.parquet
+          state_cancer_profiles_mortality.parquet
+          state_cancer_profiles_risk.parquet
+          state_cancer_profiles_demographics.parquet
           select_options.json
           scrape_catalog.jsonl
