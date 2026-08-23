@@ -224,7 +224,7 @@ Scored honestly. "Live site" = a user hand-driving the Export Data link.
 | **Vintage recorded in output** | No — header lines discarded by the parser | Present in the CSV header a user downloads | Partial — `_extracted_at` + source `url` per row; SCP's own vintage string not yet extracted (SPEC M2) |
 | **Pinned, citable versions** | No — unversioned live queries, package not on CRAN | No | Partial — immutable release tags; **DOI pending (SPEC M3)** |
 | **Offline / no-rate-limit querying** | No — every call is a live request; no cache, no throttle, no retry | No | **Yes** — download once, query locally |
-| **DOI** | No | No | **Not yet** — Zenodo backfill is M3 |
+| **DOI** | No | No | Partial — data concept 10.5281/zenodo.11098814 exists (May 2024 versions); per-vintage backfill is M3. (The record id 11102940 that surfaces in Zenodo search is that concept's 2024 version DOI — same deposit.) |
 | **Maintained** | Last commit 2024-04-17; self-labelled "Concept – Not useable"; 17 open issues | N/A (NCI-operated) | Monthly automated releases |
 
 ## Bottom line for the manuscript
@@ -235,7 +235,11 @@ Claims that survive this comparison:
    difference in kind, and it is the strongest claim. State the mechanism precisely — the site
    *can* return all counties in one call, so the correct framing is "one request per statistical
    stratum", **not** "one request per county" or "per state". An overstatement here is easy for a
-   reviewer to falsify with a single URL.
+   reviewer to falsify with a single URL. **Wording correction from the literature pass
+   (docs/landscape-literature.md §1a):** another team has independently built a national SCP
+   sweep — the Cancer InFocus data layer (CIOData/CIFTools_update), unpublished, unversioned, no
+   DOI, feeding a dashboard. So the claim is "nobody else has *published* the result as a
+   versioned, citable dataset", never "nobody else does this".
 2. **Historical vintages.** SCP publishes only current data and `cancerprof` caches nothing, so
    before this archive there was no way to obtain a superseded SCP vintage at all. Nothing in the
    landscape competes on this axis. Given that upstream schema drift is demonstrable (the RUCC
