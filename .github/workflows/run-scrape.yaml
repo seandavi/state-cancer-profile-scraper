@@ -103,3 +103,7 @@ jobs:
           state_cancer_profiles_demographics.parquet
           select_options.json
           scrape_catalog.jsonl
+          notes_incidence.txt
+          notes_mortality.txt
+          notes_risk.txt
+          notes_demographics.txt
