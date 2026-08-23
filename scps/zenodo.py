@@ -16,6 +16,8 @@ from pathlib import Path
 
 import httpx
 
+from scps.manifest import release_files
+
 logger = logging.getLogger("scps.zenodo")
 
 PRODUCTION = "https://zenodo.org"
@@ -134,7 +136,8 @@ def vintage_metadata(dep: VintageDeposit, repo: str = "seandavi/state-cancer-pro
     ``related_identifiers`` carries every GitHub tag that captured the
     vintage — this is also the idempotency key.
     """
-    tag_urls = [f"https://github.com/{repo}/releases/tag/release-{t}" for t in dep.tags]
+    # Git tags are bare dates ("2026-06-01"); "release-" is only in the title.
+    tag_urls = [f"https://github.com/{repo}/releases/tag/{t}" for t in dep.tags]
     description = (
         f"<p>State Cancer Profiles data extract — vintage {dep.vintage_id}. "
         f"Complete national county- and state-level extract scraped from "
@@ -170,7 +173,7 @@ def deposited_tags(versions: list[dict]) -> set[str]:
         for rel in v.get("metadata", {}).get("related_identifiers", []):
             ident = rel.get("identifier", "")
             if "/releases/tag/" in ident:
-                tags.add(ident.rsplit("/releases/tag/release-", 1)[-1])
+                tags.add(ident.rsplit("/releases/tag/", 1)[-1])
     return tags
 
 
@@ -190,7 +193,7 @@ def plan_backfill(
             logger.info("%s already deposited — skipping", vid)
             continue
         best_dir = release_root / info["best_capture"]
-        files = sorted(p for p in best_dir.iterdir() if p.is_file())
+        files = release_files(best_dir)
         plan.append(
             VintageDeposit(
                 vintage_id=vid,

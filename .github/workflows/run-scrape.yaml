@@ -107,3 +107,37 @@ jobs:
           notes_mortality.txt
           notes_risk.txt
           notes_demographics.txt
+
+    - name: Manifest and Zenodo publish
+      env:
+        ZENODO_TOKEN: ${{ secrets.ZENODO_TOKEN }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Same code path as the backfill (SPEC M4). Publishes a new Zenodo
+        # version only when the scrape is a new vintage; without a token it
+        # still builds the manifest but records nothing (dry-run).
+        if [ -n "$ZENODO_TOKEN" ]; then
+          uv run python scripts/zenodo/publish_release.py \
+            --release-dir . --tag "${{ steps.date.outputs.date }}"
+        else
+          echo "ZENODO_TOKEN not configured — manifest only, skipping Zenodo publish."
+          uv run python scripts/zenodo/publish_release.py \
+            --release-dir . --tag "${{ steps.date.outputs.date }}" --dry-run
+        fi
+        gh release upload "${{ steps.date.outputs.date }}" manifest.json --clobber
+
+    - name: Record run in ledger
+      run: |
+        mkdir -p ledger
+        printf '{"run":"%s","scraper_sha":"%s","workflow_run":"%s"}\n' \
+          "${{ steps.date.outputs.date }}" "${{ github.sha }}" "${{ github.run_id }}" \
+          >> ledger/runs.ndjson
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add ledger/runs.ndjson data/vintages.json
+        if git diff --cached --quiet; then
+          echo "Nothing to record."
+        else
+          git commit -m "Record run ${{ steps.date.outputs.date }}"
+          git push
+        fi

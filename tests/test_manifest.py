@@ -95,3 +95,20 @@ def test_assign_vintage_detects_new(tmp_path):
     vintages = _vintages("deadbeef", "deadbeef")
     vid, is_new = manifest.assign_vintage(m, vintages)
     assert (vid, is_new) == ("V2", True)
+
+
+def test_release_files_ignores_non_release_artifacts(tmp_path):
+    """In CI the release dir is the repo checkout root — only release
+    artifacts may enter the manifest or a Zenodo deposit."""
+    rel = _write_release(tmp_path, "2026-01-01T00:00:00")
+    (rel / "README.md").write_text("repo file")
+    (rel / "pyproject.toml").write_text("[project]")
+    (rel / "manifest.json").write_text("{}")
+    names = {p.name for p in manifest.release_files(rel)}
+    assert "README.md" not in names
+    assert "pyproject.toml" not in names
+    assert "manifest.json" not in names
+    assert "state_cancer_profiles_incidence.csv.gz" in names
+    assert "gh_hash.txt" in names
+    m = manifest.build_manifest(rel, "t")
+    assert all(f["filename"] != "README.md" for f in m["files"])
