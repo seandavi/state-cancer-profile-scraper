@@ -44,6 +44,15 @@ differentiates. Honest vintage count (3, prospective record). -->
   SeerMapper, spGARCH) as motivating evidence; no third-party full extract
   deposited in any generalist repository.
 - This resource: what it is, complementary to cancerprof, not competing.
+- Bulk claim wording (falsifiable otherwise): "nobody else has PUBLISHED
+  the result as a versioned citable dataset" — CIFTools (Cancer InFocus
+  data layer) is an unpublished national sweep; verify its attribution
+  by hand before naming the group (docs/landscape-literature.md §1a).
+- Vintage anchor citations: croushore2001realtime / croushore2003vintage
+  (economics lineage, introduce as analogy) and clegg2002reportingdelay
+  (SEER reporting-delay revisions flipped trend signs — the cancer-domain
+  demonstration). Demand evidence: burus2025cifimpact (26 NCI-designated
+  centers licensing Cancer InFocus). Genre model: hasell2020testing.
 -->
 
 # Methods
@@ -120,7 +129,17 @@ for r in rows:
 - Pre-2026-05-28 releases: filter on areatype, not locale_type; the
   harmonized view fixes this.
 - Suppression semantics differ between historical (rows absent) and
-  post-hardening (typed nulls + reason) releases.
+  post-hardening (typed nulls + reason) releases. The archive does NOT
+  un-suppress anything — cite jacobson2026pediatric / ladas2026melanoma /
+  kasheri2026dermatologist as the documented failure mode the reason
+  columns make countable.
+- Risk/screening estimates are MODELLED small-area estimates
+  (raghunathan2007combining, liu2019smallarea), not registry-observed —
+  different epistemic status from incidence/mortality; they can change
+  between vintages because the model was refit.
+- Trend columns are Joinpoint outputs whose software defaults have
+  changed over time (kim2022twentyyears): do not compare AAPC across
+  vintages without checking the producing version.
 -->
 
 # Code availability {.unnumbered}
