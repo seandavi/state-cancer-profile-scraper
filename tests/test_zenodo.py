@@ -39,7 +39,7 @@ def _version(tag: str) -> dict:
             "publication_date": "2024-08-02",
             "related_identifiers": [
                 {
-                    "identifier": f"https://github.com/seandavi/state-cancer-profile-scraper/releases/tag/release-{tag}",
+                    "identifier": f"https://github.com/seandavi/state-cancer-profile-scraper/releases/tag/{tag}",
                     "relation": "isSupplementTo",
                 }
             ],
@@ -74,8 +74,8 @@ def test_vintage_metadata_carries_identity_and_tags(tmp_path):
     assert md["license"] == "cc-by-4.0"
     assert md["upload_type"] == "dataset"
     idents = [r["identifier"] for r in md["related_identifiers"]]
-    assert any("release-2025-02-10" in i for i in idents)
-    assert any("release-2025-03-01" in i for i in idents)
+    assert any(i.endswith("/releases/tag/2025-02-10") for i in idents)
+    assert any(i.endswith("/releases/tag/2025-03-01") for i in idents)
     assert "vintage V2" in md["title"]
     # The description states the best-vs-first capture distinction.
     assert "most" in md["description"] and "first" in md["description"]

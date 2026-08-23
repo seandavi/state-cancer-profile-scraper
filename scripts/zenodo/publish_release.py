@@ -36,20 +36,45 @@ def main() -> int:
     ap.add_argument("--sandbox", action="store_true")
     ap.add_argument("--base-record", default=None)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--assume-vintage",
+        default=None,
+        metavar="VID",
+        help=(
+            "Assign this release to an existing vintage id, overriding the "
+            "content-hash comparison. Required when the SCRAPER's output "
+            "format changed (new columns, row-filter changes): hashes then "
+            "differ even if upstream data didn't, and only a value-level "
+            "comparison on common strata (docs/releases.md §1.1) can decide. "
+            "The release's hashes are learned into the vintage so future "
+            "same-format releases compare normally."
+        ),
+    )
     args = ap.parse_args()
 
     m = manifest_mod.build_manifest(args.release_dir, args.tag)
     (args.release_dir / "manifest.json").write_text(json.dumps(m, indent=1) + "\n")
 
     vintages = manifest_mod.load_vintages(args.vintages)
-    vid, is_new = manifest_mod.assign_vintage(m, vintages)
+    if args.assume_vintage:
+        if args.assume_vintage not in vintages["vintages"]:
+            ap.error(f"--assume-vintage {args.assume_vintage} not in {args.vintages}")
+        vid, is_new = args.assume_vintage, False
+        info = vintages["vintages"][vid]
+        for topic, h in m["content_hashes"].items():
+            hashes = info["content_sha256"].setdefault(topic, [])
+            if h not in hashes:
+                hashes.append(h)
+    else:
+        vid, is_new = manifest_mod.assign_vintage(m, vintages)
     if not is_new:
         # Record the tag under its vintage so the mapping stays complete.
         info = vintages["vintages"][vid]
         if args.tag not in info["releases"]:
             info["releases"].append(args.tag)
             info["best_capture"] = args.tag
-            args.vintages.write_text(json.dumps(vintages, indent=1) + "\n")
+            if not args.dry_run:
+                args.vintages.write_text(json.dumps(vintages, indent=1) + "\n")
         logging.info("%s is vintage %s (already deposited) — nothing to publish.", args.tag, vid)
         return 0
 
@@ -68,7 +93,8 @@ def main() -> int:
         tags=[args.tag],
         publication_date=args.tag,
         best_capture=args.tag,
-        files=sorted(p for p in args.release_dir.iterdir() if p.is_file()),
+        files=manifest_mod.release_files(args.release_dir)
+        + [args.release_dir / "manifest.json"],
     )
 
     if args.sandbox:
@@ -89,6 +115,9 @@ def main() -> int:
         zenodo.run_deposit(client, str(latest), dep, dry_run=False)
     else:
         zenodo.run_deposit(zenodo.ZenodoClient(zenodo.SANDBOX, "dry"), "0", dep, dry_run=True)
+        # Dry runs record nothing: a vintages.json entry without a deposit
+        # behind it would make the next real run skip the publish.
+        return 0
 
     args.vintages.write_text(json.dumps(vintages, indent=1) + "\n")
     return 0

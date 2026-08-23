@@ -29,6 +29,24 @@ TOPICS = ("incidence", "mortality", "risk", "demographics")
 # vintage change (docs/releases.md §1.2), so they don't participate.
 VINTAGE_TOPICS = ("incidence", "mortality")
 
+# Release artifacts, by name. build_manifest and the Zenodo deposit paths
+# operate on directories that may contain other files (in CI the scrape
+# writes into the repo checkout root) — only these are release outputs.
+RELEASE_FILE_RE = re.compile(
+    r"^(state_cancer_profiles_\w+\.(csv\.gz|parquet)"
+    r"|select_options\.json|scrape_catalog\.jsonl|gh_hash\.txt"
+    r"|notes_\w+\.txt|release_note\.txt)$"
+)
+
+
+def release_files(release_dir: Path) -> list[Path]:
+    """The release artifacts present in a directory, sorted by name."""
+    return sorted(
+        p for p in release_dir.iterdir()
+        if p.is_file() and RELEASE_FILE_RE.match(p.name)
+    )
+
+
 _CREATED_RE = re.compile(
     r"Created by statecancerprofiles\.cancer\.gov on ([0-9/]+)"
 )
@@ -74,9 +92,7 @@ def build_manifest(release_dir: Path, tag: str) -> dict:
     """Manifest for one release directory (downloaded GitHub release assets)."""
     files = []
     content_hashes: dict[str, str] = {}
-    for path in sorted(release_dir.iterdir()):
-        if not path.is_file():
-            continue
+    for path in release_files(release_dir):
         entry: dict = {
             "filename": path.name,
             "sha256": sha256_file(path),
