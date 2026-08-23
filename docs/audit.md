@@ -99,10 +99,16 @@ The SPEC expected low yield. Pre-2023 captures of `index.php` query outputs with
 | risk | 255 |
 | **total** | **18,971** |
 
-Incidence alone also shows ~65k HTTP-200 captures of any mimetype. Retrospective vintage
-reconstruction is plausible, not a bonus footnote. Coverage per vintage (which
-site/sex/stage/area combinations were captured) still needs assessment before the
-manuscript claims anything — captures are query-slice-shaped, not full extracts.
+**Superseded by the #34 coverage assessment (`docs/wayback-assessment.md`):** the urlkey
+counts above overcount by ~100x — they include sort-order permutations and per-state
+fan-out. Collapsed to distinct data strata, the captures are only ~200 incidence and ~84
+mortality slices (the site's default landing-page slices; crawlers never enumerate the
+race x age x sex x stage grid). Best per-vintage coverage is 1.25% (mortality 2015-2019).
+**Verdict: reconstruction is a no-go at any defensible bar.** What the captures do
+support: dating **eleven distinct pre-2023 incidence vintages (2009-2022)**, each
+overwritten and unretrievable today — shipped as a manuscript figure + small CSV, not a
+data release. Also note: mortality's true stratum denominator is 1,836, not 3,672 (stage
+is not a mortality dimension — see the duplication defect in `docs/wayback-assessment.md` §7).
 
 ## 7. Credentials
 

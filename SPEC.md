@@ -182,7 +182,7 @@ Two arguments, ordered. **Reuse value leads; the archive differentiates.**
 
 **2. The vintage archive (what makes it non-substitutable).** SCP overwrites; no archive of prior estimates exists, and a live query client structurally cannot preserve what the source has already replaced. This is what answers "why not just use `cancerprof`" — and the two are complementary, not competing, which the paper should say plainly.
 
-Report the vintage count honestly, including if it is small, and describe the archive as establishing a prospective record. Wayback yield (Task 0 item 6) came back high — thousands of pre-2023 CSV captures — so retrospective reconstruction is plausible, but the captures are query slices, not full extracts. The paper may *mention* the retrospective potential; it does not depend on it, and no reconstructed vintage ships until its coverage is assessed (tracked as its own issue, outside the paper's critical path).
+Report the vintage count honestly, including if it is small, and describe the archive as establishing a prospective record. Retrospective Wayback reconstruction is settled: **no-go** (best per-vintage coverage 1.25%; `docs/wayback-assessment.md`). What the captures deliver instead is the **vintage timeline** — eleven distinct pre-2023 incidence data windows, each overwritten and unretrievable today — which becomes a Background figure plus a small CSV and converts the retrospective gap from a weakness into the motivation. Prospective vintages remain the archive's substance.
 
 Do not write the abstract until Task 0 items 6, 8, and 10 are reported.
 
