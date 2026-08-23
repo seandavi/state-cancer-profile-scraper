@@ -10,6 +10,7 @@ keyed by topic, so we parse that file alongside the HTML select options.
 
 from __future__ import annotations
 
+import io
 import logging
 import re
 from collections.abc import Callable, Iterable, Iterator
@@ -19,7 +20,13 @@ import httpx
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from scps.scraper import column_text_replace
+from scps.scraper import (
+    NA_VALUES,
+    column_text_replace,
+    decode_suppression,
+    fetch_report,
+    split_report,
+)
 
 logger = logging.getLogger("scps.demographics")
 
@@ -160,11 +167,11 @@ def get_demographics_table(
     )
     logger.debug(url)
 
+    data_csv, notes = split_report(fetch_report(url))
     df = pd.read_csv(
-        url,
-        skiprows=6,
+        io.StringIO(data_csv),
         low_memory=False,
-        na_values=["*", "N/A", " N/A", "N/A ", " N/A "],
+        na_values=NA_VALUES,
         skipinitialspace=True,
         dtype={"FIPS": str, "HSA_Code": str},
     )
@@ -216,8 +223,10 @@ def get_demographics_table(
     df["url"] = url.replace("&output=1", "")
 
     if "percent" in df.columns:
+        df["suppression_reason"] = decode_suppression(df["percent"])
         df["percent"] = pd.to_numeric(df["percent"], errors="coerce")
 
+    df.attrs["scp_notes"] = notes
     return df
 
 
@@ -292,4 +301,10 @@ def demographics_master_table(
 
     if not dflist:
         return pd.DataFrame()
-    return pd.concat(dflist, ignore_index=True)
+    notes = next(
+        (d.attrs["scp_notes"] for d in dflist if d.attrs.get("scp_notes")), None
+    )
+    df = pd.concat(dflist, ignore_index=True)
+    if notes:
+        df.attrs["scp_notes"] = notes
+    return df

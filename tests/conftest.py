@@ -1,9 +1,9 @@
-"""Pre-import the scps.scraper module under a mocked httpx.get.
+"""Prime the cached select-option vocabulary under a mocked httpx.get.
 
-``scps.scraper.get_select_options()`` runs at module import time and would
-otherwise hit the live State Cancer Profiles website. We force the import
-here, with httpx patched, before any test module loads. After the import,
-the patch is released so individual tests can patch httpx themselves.
+``scps.scraper.select_options()`` is fetched lazily and cached (no network
+at import time — #37). Tests that exercise ``get_table`` need the vocabulary
+populated, so we prime the cache here with a small fixture while httpx is
+patched. Individual tests can still patch httpx themselves.
 """
 
 from unittest.mock import MagicMock, patch
@@ -43,9 +43,7 @@ MOCK_SELECT_HTML = """
 _mock_response = MagicMock()
 _mock_response.text = MOCK_SELECT_HTML
 
-_httpx_patch = patch("httpx.get", return_value=_mock_response)
-_httpx_patch.start()
-try:
-    import scps.scraper  # noqa: F401  (force module load while patched)
-finally:
-    _httpx_patch.stop()
+with patch("httpx.get", return_value=_mock_response):
+    import scps.scraper
+
+    scps.scraper.select_options()  # populate the lru_cache under the mock

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import date
 from pathlib import Path
 
 import click
@@ -42,6 +43,18 @@ PARQUET_FILES = {
 }
 
 DEFAULT_CATALOG_FILENAME = "scrape_catalog.jsonl"
+
+
+def _write_notes(df, endpoint: str, output_dir: Path) -> None:
+    """Persist the SCP report notes (title + footnotes) for one endpoint.
+
+    The notes carry the "Created by statecancerprofiles.cancer.gov on DATE"
+    vintage string and the submission year — the provenance manifest.py
+    extracts rather than infers (#36). One file per endpoint per run.
+    """
+    notes = df.attrs.get("scp_notes")
+    if notes:
+        (output_dir / f"notes_{endpoint}.txt").write_text(notes + "\n")
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -114,11 +127,13 @@ def scrape(
 ) -> None:
     """Run the scraper and write gzipped CSVs to ``--output-dir``."""
     selected = tuple(d.lower() for d in datasets) or DATASET_CHOICES
+    run_date = date.today().isoformat()
     output_dir.mkdir(parents=True, exist_ok=True)
     areas = tuple(a.lower() for a in areatypes) or ("county", "state")
     catalog_path = catalog_path or (output_dir / DEFAULT_CATALOG_FILENAME)
 
     catalog = catalog_mod.Catalog.load(catalog_path)
+    _migrate_mortality_stage(catalog)
     if refresh_catalog:
         # Refresh only the *selected* endpoints' entries — preserve others so a
         # targeted refresh (e.g. -d risk --refresh-catalog) doesn't wipe the
@@ -174,6 +189,76 @@ def scrape(
 
     if catalog_driven:
         _probe_new_ids(catalog, selected, risk_options, demo_options)
+        _fail_on_regressions(catalog, selected, run_date)
+
+
+def _migrate_mortality_stage(catalog: catalog_mod.Catalog) -> None:
+    """Drop the phantom stage dimension from mortality catalog entries (#43).
+
+    Catalogs written before the fix carry stage=211/999 pairs per mortality
+    combo; without this migration the shrunk combo space would trip the
+    regression oracle. One-time surgery; a no-op on migrated catalogs.
+    """
+    merged: dict = {}
+    changed = False
+    keep: list = []
+    for entry in catalog.entries:
+        if entry.endpoint != "mortality" or "stage" not in entry.combo:
+            keep.append(entry)
+            continue
+        changed = True
+        entry.combo = {k: v for k, v in entry.combo.items() if k != "stage"}
+        key = tuple(sorted(entry.combo.items()))
+        prior = merged.get(key)
+        if prior is None:
+            merged[key] = entry
+            keep.append(entry)
+        else:
+            prior.last_seen = max(prior.last_seen, entry.last_seen)
+    if changed:
+        removed = len(catalog.entries) - len(keep)
+        catalog.entries = keep
+        logger.info(
+            "Migrated mortality catalog entries: stage dimension removed, "
+            "%d duplicate entries merged.", removed,
+        )
+
+
+def _fail_on_regressions(
+    catalog: catalog_mod.Catalog,
+    selected: tuple[str, ...],
+    run_date: str,
+) -> None:
+    """Exit non-zero if any known-good combo stopped returning data.
+
+    The catalog is the regression oracle: in a catalog-driven run every
+    recorded combo is attempted, so one that fails used to work — most
+    likely an upstream schema change (see docs/landscape.md on how exactly
+    this failure mode sat undetected in cancerprof for 17 months). Only
+    never-recorded combos may fail quietly.
+    """
+    regressed: dict[str, int] = {}
+    for endpoint in selected:
+        missing = catalog.unseen_since(endpoint, run_date)
+        if not missing:
+            continue
+        regressed[endpoint] = len(missing)
+        for entry in missing[:5]:
+            logger.error(
+                "Regression: known-good %s combo returned no data: %s",
+                endpoint,
+                entry.combo,
+            )
+        if len(missing) > 5:
+            logger.error(
+                "... and %d more failed %s combos", len(missing) - 5, endpoint
+            )
+    if regressed:
+        raise click.ClickException(
+            f"known-good combos stopped returning data: {regressed}. "
+            "Upstream layout may have changed; investigate before releasing "
+            "(or re-run with --refresh-catalog after confirming the loss is real)."
+        )
 
 
 def _run_incidence_or_mortality(
@@ -203,6 +288,7 @@ def _run_incidence_or_mortality(
     parquet_out = output_dir / PARQUET_FILES[endpoint]
     logger.info("Writing %s", parquet_out)
     df.to_parquet(parquet_out, index=False)
+    _write_notes(df, endpoint, output_dir)
 
 
 def _run_risk(
@@ -227,6 +313,7 @@ def _run_risk(
     parquet_out = output_dir / PARQUET_FILES["risk"]
     logger.info("Writing %s", parquet_out)
     df.to_parquet(parquet_out, index=False)
+    _write_notes(df, "risk", output_dir)
     return options
 
 
@@ -259,6 +346,7 @@ def _run_demographics(
     parquet_out = output_dir / PARQUET_FILES["demographics"]
     logger.info("Writing %s", parquet_out)
     df.to_parquet(parquet_out, index=False)
+    _write_notes(df, "demographics", output_dir)
     return options
 
 

@@ -146,7 +146,12 @@ def test_scrape_uses_catalog_when_present(tmp_path):
     captured_combos = []
 
     def capture(*_args, combos=None, on_success=None, **_kw):
-        captured_combos.append(list(combos) if combos is not None else None)
+        combo_list = list(combos) if combos is not None else None
+        captured_combos.append(combo_list)
+        # Re-confirm every combo so the regression check stays green.
+        if on_success is not None and combo_list:
+            for combo in combo_list:
+                on_success(combo, 52)
         return pd.DataFrame({"reported_locale": ["X"], "fips": ["00000"]})
 
     with (
@@ -233,3 +238,94 @@ def test_refresh_preserves_other_endpoints_entries(tmp_path):
     assert by_endpoint["risk"]["topic"] == "new"
     assert by_endpoint["incidence"]["cancer"] == "001"
     assert by_endpoint["demographics"]["topic"] == "crowd"
+
+
+def test_catalog_driven_run_fails_on_regressed_combo(tmp_path):
+    """A known-good combo that stops returning data must fail the run (#38)."""
+    catalog_path = tmp_path / "scrape_catalog.jsonl"
+    catalog_path.write_text(
+        "\n".join(
+            [
+                json.dumps({
+                    "endpoint": "risk", "topic": "alcohol", "risk": "v505",
+                    "race": "00", "sex": "0", "statefips": "00",
+                    "rows": 52, "discovered": "2026-01-01", "last_seen": "2026-01-01",
+                }),
+                json.dumps({
+                    "endpoint": "risk", "topic": "smoke", "risk": "v19",
+                    "race": "00", "sex": "0", "statefips": "00",
+                    "rows": 52, "discovered": "2026-01-01", "last_seen": "2026-01-01",
+                }),
+            ]
+        )
+        + "\n"
+    )
+
+    def one_combo_fails(*_args, combos=None, on_success=None, **_kw):
+        # Only the alcohol combo returns data this run; smoke regresses.
+        for combo in combos or []:
+            if combo["topic"] == "alcohol" and on_success is not None:
+                on_success(combo, 52)
+        return pd.DataFrame({"reported_locale": ["X"], "fips": ["00000"]})
+
+    runner = CliRunner()
+    with (
+        patch("scps.cli.risk.risk_master_table", side_effect=one_combo_fails),
+        patch("scps.cli.risk.get_risk_options", return_value={"topic": {}}),
+    ):
+        result = runner.invoke(
+            cli.cli, ["scrape", "-d", "risk", "-o", str(tmp_path)]
+        )
+
+    assert result.exit_code != 0
+    assert "known-good combos stopped returning data" in result.output
+
+
+def test_notes_file_written_when_master_table_carries_notes(tmp_path):
+    """The SCP report notes block is persisted per endpoint (#36)."""
+
+    def fake_risk_with_notes(*_args, on_success=None, **_kw):
+        if on_success is not None:
+            on_success({"topic": "alcohol", "risk": "v505"}, 1)
+        df = pd.DataFrame({"reported_locale": ["X"], "fips": ["00000"]})
+        df.attrs["scp_notes"] = (
+            "Created by statecancerprofiles.cancer.gov on 08/23/2026 11:35 am."
+        )
+        return df
+
+    runner = CliRunner()
+    with (
+        patch("scps.cli.risk.risk_master_table", side_effect=fake_risk_with_notes),
+        patch("scps.cli.risk.get_risk_options", return_value={"topic": {}}),
+    ):
+        result = runner.invoke(
+            cli.cli, ["scrape", "-d", "risk", "-o", str(tmp_path)]
+        )
+
+    assert result.exit_code == 0, result.output
+    notes_file = tmp_path / "notes_risk.txt"
+    assert notes_file.exists()
+    assert "Created by statecancerprofiles.cancer.gov" in notes_file.read_text()
+
+
+def test_mortality_catalog_migration_drops_stage_and_merges(tmp_path):
+    """Pre-#43 catalogs carry stage=999/211 pairs per mortality combo."""
+    from scps.cli import _migrate_mortality_stage
+    from scps import catalog as catalog_mod
+
+    cat = catalog_mod.Catalog(path=tmp_path / "c.jsonl")
+    base = {"cancer": "001", "age": "001", "sex": "0", "race": "00", "areatype": "county"}
+    cat.entries = [
+        catalog_mod.CatalogEntry("mortality", {**base, "stage": "999"}, 10, "2026-01-01", "2026-01-01"),
+        catalog_mod.CatalogEntry("mortality", {**base, "stage": "211"}, 10, "2026-01-01", "2026-02-01"),
+        catalog_mod.CatalogEntry("incidence", {**base, "stage": "211"}, 10, "2026-01-01", "2026-01-01"),
+    ]
+    _migrate_mortality_stage(cat)
+
+    mort = [e for e in cat.entries if e.endpoint == "mortality"]
+    assert len(mort) == 1
+    assert "stage" not in mort[0].combo
+    assert mort[0].last_seen == "2026-02-01"  # max of the merged pair
+    # Incidence untouched — stage is a real dimension there.
+    inc = [e for e in cat.entries if e.endpoint == "incidence"]
+    assert inc[0].combo["stage"] == "211"
