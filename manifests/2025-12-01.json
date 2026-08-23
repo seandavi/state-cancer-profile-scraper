@@ -1,0 +1,37 @@
+{
+ "tag": "2025-12-01",
+ "files": [
+  {
+   "filename": "gh_hash.txt",
+   "sha256": "47c5024c509d7640436835172985cc141cb902dd8686e574a3d6aca790607b65",
+   "bytes": 41
+  },
+  {
+   "filename": "select_options.json",
+   "sha256": "3e4e91c629bebec0a062ec49e60437e6d8940b5803abac2b8efdf663bc9ac684",
+   "bytes": 2295
+  },
+  {
+   "filename": "state_cancer_profiles_incidence.csv.gz",
+   "sha256": "cd8aa59400e9551dee01c3502f305dc27d8523a534d0b5c50cfe5a35b5701119",
+   "bytes": 34020095,
+   "format": "csv.gz",
+   "topic": "incidence",
+   "rows": 1014762,
+   "content_sha256": "2ae50c264b32f2824c74fe7cdd338fcf14aa745835f552eb14d4b3d1a9f5548f"
+  },
+  {
+   "filename": "state_cancer_profiles_mortality.csv.gz",
+   "sha256": "e38e549453e6e1b7a5e0791cfc7d28ad171e5aa5ebd1a0605058611acea435d2",
+   "bytes": 27683009,
+   "format": "csv.gz",
+   "topic": "mortality",
+   "rows": 782632,
+   "content_sha256": "7e766d8f9630c641b56d22761e24f804c7d1f9adb5dc1f5b787c660588ef8931"
+  }
+ ],
+ "content_hashes": {
+  "incidence": "2ae50c264b32f2824c74fe7cdd338fcf14aa745835f552eb14d4b3d1a9f5548f",
+  "mortality": "7e766d8f9630c641b56d22761e24f804c7d1f9adb5dc1f5b787c660588ef8931"
+ }
+}

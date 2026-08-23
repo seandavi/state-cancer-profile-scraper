@@ -1,0 +1,21 @@
+{
+  "comment": "Harmonization decisions as data (SPEC M2). race_canonical maps a cleaned topic-local race label to the incidence/mortality vocabulary ONLY where the populations are semantically identical (formatting, escaping, or typo differences). Labels absent here denote populations with no exact equivalent (e.g. demographics 'Asian Non-Hispanic' is not incidence 'Asian / Pacific Islander (Non-Hispanic)') and keep race_canonical null.",
+  "column_renames": {
+    "2023_rural_urban_continuum_codesrural_urban_note": "rural_urban"
+  },
+  "race_label_fixes": {
+    "White (includes Hispanic": "White (includes Hispanic)"
+  },
+  "race_canonical": {
+    "All Races (includes Hispanic)": "All Races (includes Hispanic)",
+    "Hispanic (any race)": "Hispanic (any race)",
+    "White (Non-Hispanic)": "White (Non-Hispanic)",
+    "White Non-Hispanic": "White (Non-Hispanic)",
+    "Black (Non-Hispanic)": "Black (Non-Hispanic)",
+    "Black Non-Hispanic": "Black (Non-Hispanic)",
+    "Amer. Indian / AK Native (Non-Hispanic)": "Amer. Indian / AK Native (Non-Hispanic)",
+    "American Indian/Alaska Native Non-Hispanic": "Amer. Indian / AK Native (Non-Hispanic)",
+    "Asian / Pacific Islander (Non-Hispanic)": "Asian / Pacific Islander (Non-Hispanic)",
+    "Asian / Pacifice Islander (Non-Hispanic)": "Asian / Pacific Islander (Non-Hispanic)"
+  }
+}
