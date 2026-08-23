@@ -26,6 +26,7 @@ from scps.scraper import (
     column_text_replace,
     decode_suppression,
     fetch_report,
+    parallel_fetch,
     split_report,
 )
 
@@ -263,17 +264,12 @@ def risk_master_table(
         )
         combos = iter_risk_combos(opts, statefipses)
 
-    dflist: list[pd.DataFrame] = []
-    for combo in combos:
-        try:
-            df = get_risk_table(options=opts, **combo)
-            dflist.append(df)
-            if on_success is not None:
-                on_success(combo, len(df))
-        except KeyboardInterrupt:
-            raise
-        except Exception as exc:
-            logger.debug("Skipped %s: %s", combo, exc)
+    dflist = [
+        df
+        for _combo, df in parallel_fetch(
+            combos, lambda c: get_risk_table(options=opts, **c), on_success
+        )
+    ]
 
     if not dflist:
         return pd.DataFrame()

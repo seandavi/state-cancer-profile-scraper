@@ -446,3 +446,23 @@ def test_master_table_dedupes_stage_for_death():
 
     assert len(calls) == 1
     assert "stage" not in calls[0]
+
+
+def test_parallel_fetch_preserves_order_and_swallows_failures():
+    """Concurrency must not change result order or failure semantics (#45)."""
+    def fetch(combo):
+        if combo["id"] == 2:
+            raise ValueError("invalid combo")
+        return pd.DataFrame({"x": [combo["id"]]})
+
+    successes = []
+    results = list(
+        scraper.parallel_fetch(
+            [{"id": i} for i in range(5)],
+            fetch,
+            on_success=lambda c, n: successes.append(c["id"]),
+            workers=3,
+        )
+    )
+    assert [c["id"] for c, _ in results] == [0, 1, 3, 4]
+    assert successes == [0, 1, 3, 4]

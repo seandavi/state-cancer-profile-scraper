@@ -328,6 +328,40 @@ def _dedupe_death_combos(combos: Iterable[dict]) -> Iterator[dict]:
             yield combo
 
 
+def parallel_fetch(combos, fetch_one, on_success=None, workers=None):
+    """Fetch combos concurrently; yield (combo, df) in combo order.
+
+    Bounded thread-pool concurrency so a full scrape fits inside CI's
+    6-hour job limit (#45) while staying polite to the upstream site.
+    Failures come back as (combo, None) — same swallow-invalid-combos
+    semantics as the old sequential loop. Results are yielded in input
+    order and the caller invokes ``on_success`` on its own thread, so
+    catalog recording needs no locking.
+    """
+    import os
+    from concurrent.futures import ThreadPoolExecutor
+
+    if workers is None:
+        workers = int(os.environ.get("SCPS_WORKERS", "6"))
+
+    def _fetch(combo):
+        try:
+            return combo, fetch_one(combo)
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            logger.debug("Skipped %s: %s", combo, exc)
+            return combo, None
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for combo, df in pool.map(_fetch, combos):
+            if df is None:
+                continue
+            if on_success is not None:
+                on_success(combo, len(df))
+            yield combo, df
+
+
 def master_table(
     year: str = "0",
     stateFIPS: str = "00",
@@ -361,18 +395,12 @@ def master_table(
     if _type == "death":
         combos = _dedupe_death_combos(combos)
 
-    dflist = []
-    for combo in combos:
-        try:
-            df = get_table(_type=_type, **combo)
-            dflist.append(df)
-            if on_success is not None:
-                on_success(combo, len(df))
-        except KeyboardInterrupt:
-            raise
-        except Exception as e:
-            logger.debug("Caught an exception, but ignoring it")
-            logger.debug(e)
+    dflist = [
+        df
+        for _combo, df in parallel_fetch(
+            combos, lambda c: get_table(_type=_type, **c), on_success
+        )
+    ]
     # concat() drops .attrs; carry the first fetch's notes block forward so
     # the CLI can persist it (vintage string lives there — see #36).
     notes = next(
