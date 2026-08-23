@@ -1,0 +1,62 @@
+{
+ "tag": "2026-06-01",
+ "files": [
+  {
+   "filename": "gh_hash.txt",
+   "sha256": "c618f208070e570124494c0934967a8654365b7c943950c281beeccd6d4353b5",
+   "bytes": 41
+  },
+  {
+   "filename": "scrape_catalog.jsonl",
+   "sha256": "182b65de5d61920f46159a595296c7517854e9f7d33fae3357ed6bee3c850e5d",
+   "bytes": 3536069
+  },
+  {
+   "filename": "select_options.json",
+   "sha256": "51a23a754a2d4f2eb05e78a846d7f7c34c1f1266877867797213a04e69b502e2",
+   "bytes": 3765
+  },
+  {
+   "filename": "state_cancer_profiles_demographics.csv.gz",
+   "sha256": "fc21126232b7dca4ff22959aa0ceeceea269ddf22108d33745935da002e8983c",
+   "bytes": 61867234,
+   "format": "csv.gz",
+   "topic": "demographics",
+   "rows": 3310984,
+   "content_sha256": "6a8dfedb0c077c0b5e8f4f72e336eebaa4749134d35287db21e093df5062630b"
+  },
+  {
+   "filename": "state_cancer_profiles_incidence.csv.gz",
+   "sha256": "ec6bc04db4e5b43273c9735f395d8eba47576fcfe0978cad0214f409c7008491",
+   "bytes": 48923235,
+   "format": "csv.gz",
+   "topic": "incidence",
+   "rows": 1476853,
+   "content_sha256": "db2b0672dfdfc87e263efd89da269d667a725060f430a8986f63aa341545e5fa"
+  },
+  {
+   "filename": "state_cancer_profiles_mortality.csv.gz",
+   "sha256": "8c031c97289b76c49d6239fabb1d23fa8016954501183eb2da27ada6fee9a2dd",
+   "bytes": 35507557,
+   "format": "csv.gz",
+   "topic": "mortality",
+   "rows": 1034042,
+   "content_sha256": "ec50eace83b001b12332da62e7c538039485789a90e30da0ceabe6717f5d4f4c"
+  },
+  {
+   "filename": "state_cancer_profiles_risk.csv.gz",
+   "sha256": "2fcf62382b26d2ec89ac3b111c725189b5ee1cc0abf418c13360e156b3207747",
+   "bytes": 1460080,
+   "format": "csv.gz",
+   "topic": "risk",
+   "rows": 83429,
+   "content_sha256": "36fc0cc9a8a9867168b31e8c74a49e34bcf2a24588a5e9ccb31bb4e8a131170d"
+  }
+ ],
+ "content_hashes": {
+  "demographics": "6a8dfedb0c077c0b5e8f4f72e336eebaa4749134d35287db21e093df5062630b",
+  "incidence": "db2b0672dfdfc87e263efd89da269d667a725060f430a8986f63aa341545e5fa",
+  "mortality": "ec50eace83b001b12332da62e7c538039485789a90e30da0ceabe6717f5d4f4c",
+  "risk": "36fc0cc9a8a9867168b31e8c74a49e34bcf2a24588a5e9ccb31bb4e8a131170d"
+ }
+}

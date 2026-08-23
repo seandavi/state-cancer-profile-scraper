@@ -1,0 +1,76 @@
+{
+ "method": "content sha256 after dropping _extracted_at; see docs/releases.md",
+ "vintages": {
+  "V1": {
+   "releases": [
+    "2024-08-02-1"
+   ],
+   "first_capture": "2024-08-02",
+   "best_capture": "2024-08-02-1",
+   "defective_releases": [],
+   "content_sha256": {
+    "incidence": [
+     "95bb771c674254becb61c635745bf34b73dcd9cd58ae3731d9ea8c5a040060b2"
+    ],
+    "mortality": [
+     "1f40af102eb84043a0eab51b77c1a95c277012864308b95f37f729ac1488496e"
+    ]
+   }
+  },
+  "V2": {
+   "releases": [
+    "2025-02-10",
+    "2025-03-01",
+    "2025-04-01",
+    "2025-05-01",
+    "2025-06-01",
+    "2025-07-01",
+    "2025-08-01",
+    "2025-09-01",
+    "2025-10-01",
+    "2025-11-01",
+    "2025-12-01",
+    "2026-01-01",
+    "2026-02-01"
+   ],
+   "first_capture": "2025-02-10",
+   "best_capture": "2026-02-01",
+   "defective_releases": [
+    "2025-05-01",
+    "2025-09-01"
+   ],
+   "content_sha256": {
+    "incidence": [
+     "2ae50c264b32f2824c74fe7cdd338fcf14aa745835f552eb14d4b3d1a9f5548f",
+     "99a237b478d8540b0ccbbaecc09477323f877025b216f152396ec9e61293ff00"
+    ],
+    "mortality": [
+     "7e766d8f9630c641b56d22761e24f804c7d1f9adb5dc1f5b787c660588ef8931",
+     "342cb495c3f13d88617bf4b68ad84d50c9a2a812eba493d03aa59169e55ce274"
+    ]
+   }
+  },
+  "V3": {
+   "releases": [
+    "2026-04-01",
+    "2026-05-01",
+    "2026-05-27",
+    "2026-05-28",
+    "2026-06-01"
+   ],
+   "first_capture": "2026-04-01",
+   "best_capture": "2026-06-01",
+   "defective_releases": [],
+   "content_sha256": {
+    "incidence": [
+     "5e7f9f50ef76c51e74770061a176667f217757716b66e142cc5fed46e032ef32",
+     "db2b0672dfdfc87e263efd89da269d667a725060f430a8986f63aa341545e5fa"
+    ],
+    "mortality": [
+     "2ecc04fa1975b0d06d66f8c88ad1d1063fb016b7cce4b25ea68120d11f6aa398",
+     "ec50eace83b001b12332da62e7c538039485789a90e30da0ceabe6717f5d4f4c"
+    ]
+   }
+  }
+ }
+}
