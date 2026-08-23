@@ -1,0 +1,133 @@
+---
+title: >-
+  A versioned, analysis-ready archive of United States State Cancer Profiles
+  county- and state-level estimates
+author:
+  - name: Sean Davis
+    orcid: 0000-0002-8991-6458
+    affiliations:
+      - University of Colorado Anschutz Medical Campus
+bibliography: refs.bib
+format:
+  pdf:
+    keep-tex: true
+execute:
+  freeze: auto
+  echo: false
+---
+
+<!--
+Scaffold only. Genre and claim-scoping rules: manuscript/CLAUDE.md.
+Every number in Technical Validation comes from an executable chunk reading
+the deposited artifacts or the checked-in manifests — never typed.
+The abstract is written LAST, from the finished sections.
+-->
+
+# Abstract {.unnumbered}
+
+<!-- TODO: write last. Reuse-value argument leads; the vintage archive
+differentiates. Honest vintage count (3, prospective record). -->
+
+# Background & Summary
+
+<!-- Draft plan (SPEC §6):
+- SCP: what it is, who uses it; no API, no bulk download, no archive
+  (dated verification: docs/no-bulk-access.md; wording template there).
+- The access problem: one stratum per request; ~18,852 requests per
+  national extract (computed below, not typed).
+- The overwrite problem: superseded estimates unrecoverable; ~98% of values
+  revised per vintage boundary.
+- Prior art: cancerprof (cite accurately: rOpenSci review closed without
+  acceptance, never on CRAN); RStateCancerProfiles (2016, abandoned);
+  CIFTools/Cancer InFocus (dashboard pipeline, no published dataset);
+  CRAN packages bundling hand-frozen one-off SCP slices (latticeExtra,
+  SeerMapper, spGARCH) as motivating evidence; no third-party full extract
+  deposited in any generalist repository.
+- This resource: what it is, complementary to cancerprof, not competing.
+-->
+
+# Methods
+
+<!-- Draft plan:
+- LEAD with suppression decoding (scoped: releases from the hardened
+  scraper forward; historical releases dropped suppressed rows — say so).
+- Scrape design: vocabulary discovered from the live site; one request per
+  stratum; catalog of known-good combinations; regression oracle.
+- Content-based payload parsing; notes preservation (vintage provenance).
+- Vintage identification by content hash (docs/releases.md method).
+- Harmonized view: crosswalks as data; strict accounting.
+- Zenodo archiving: one version DOI per vintage; best-capture bytes,
+  first-capture publication_date.
+-->
+
+# Data Records
+
+```{python}
+#| label: tbl-vintages
+#| output: asis
+import json, pathlib
+v = json.loads(pathlib.Path("../data/vintages.json").read_text())["vintages"]
+print("| Vintage | Releases | First captured | Best capture |")
+print("|---|---|---|---|")
+for vid, info in sorted(v.items()):
+    print(f"| {vid} | {len(info['releases'])} | {info['first_capture']} | {info['best_capture']} |")
+```
+
+<!-- Per-vintage DOI table once the backfill has run; file inventory from
+manifests/; schema description per topic. -->
+
+# Technical Validation
+
+```{python}
+#| label: tbl-release-integrity
+#| output: asis
+import json, pathlib
+rows = []
+for p in sorted(pathlib.Path("../manifests").glob("*.json")):
+    m = json.loads(p.read_text())
+    for f in m["files"]:
+        if f.get("topic"):
+            rows.append((m["tag"], f["topic"], f["rows"], f["sha256"][:12]))
+print("| Release | Topic | Rows | sha256 (12) |")
+print("|---|---|---|---|")
+for r in rows:
+    print("| " + " | ".join(str(x) for x in r) + " |")
+```
+
+<!-- To add, each as a chunk:
+- vintage-boundary revision fractions (~98%) recomputed from the deposits;
+- suppression census (post-hardening releases) by state and reason;
+- coverage table: Kansas incidence absence, Indiana V3 return, V1 gaps;
+- schema stability matrix (a finding, not drift);
+- cross-topic join demonstration — run it before claiming it
+  (race_canonical mapping; unmapped categories stated).
+-->
+
+# Usage Notes
+
+<!-- Must state (SPEC §6 + audit):
+- incidence and mortality cover different five-year windows; consecutive
+  vintages share four of five years — not independent observations; never
+  naively difference them.
+- SCP displays but excludes 2020 incidence from trend fits.
+- Kansas: no county incidence in any vintage; county mortality complete —
+  incidence x mortality joins drop Kansas asymmetrically.
+- Indiana county incidence exists only from V3.
+- Pre-2026-05-28 releases: filter on areatype, not locale_type; the
+  harmonized view fixes this.
+- Suppression semantics differ between historical (rows absent) and
+  post-hardening (typed nulls + reason) releases.
+-->
+
+# Code availability {.unnumbered}
+
+<!-- Repo, license, per-release gh_hash.txt pinning scraper commit. -->
+
+## Funding {.unnumbered}
+
+<!-- P30CA046934 only; verify exact CCSG wording with the grants
+administrator before posting. Rifkin-Bennis endowment alongside. -->
+
+## AI use disclosure {.unnumbered}
+
+<!-- Plain-language statement per SPEC §7. -->

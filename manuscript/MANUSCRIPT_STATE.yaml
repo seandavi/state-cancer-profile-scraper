@@ -1,0 +1,68 @@
+# scriptorium editorial state (seandavi/scriptorium). Bootstrapped from
+# SPEC.md §6 and the Task 0 audit; refine with scriptorium:init as drafting
+# proceeds.
+project:
+  title: >-
+    A versioned, analysis-ready archive of United States State Cancer
+    Profiles county- and state-level estimates
+  target_type: preprint
+  target_venue: medRxiv
+  candidate_venues:
+    - Scientific Data
+  source_format: quarto
+
+document_phase:
+  current: outline
+
+core_claims:
+  - >-
+    State Cancer Profiles offers no API, no bulk download, and no archive of
+    prior estimates; its sole machine-readable export returns one statistical
+    stratum per request (~18,900 requests for a national extract), and it
+    overwrites superseded estimates.
+  - >-
+    This resource publishes the complete national county- and state-level
+    extract of all four SCP data topics as typed, analysis-ready files with
+    the stratifying dimensions as columns, under pinned, citable version
+    DOIs — one per distinct upstream data vintage.
+  - >-
+    The archive preserves superseded vintages that no live query client can
+    recover; ~98% of estimate values were revised at each observed vintage
+    boundary, so vintage identity materially affects downstream analysis.
+  - >-
+    From the first post-hardening release forward, suppressed cells are
+    decoded into typed nulls with an explicit suppression-reason column,
+    distinguishing small-count suppression from state-law withholding.
+
+known_weaknesses:
+  - Only three vintages captured to date; the archive is primarily a prospective record.
+  - Vintage boundaries are bracketed by release gaps, not dated; intermediate upstream vintages could have gone uncaptured.
+  - Historical releases (V1-V3) are CSV-only and dropped suppressed rows; suppression there is recoverable only by cross-product differencing.
+  - Kansas county incidence is absent in every vintage; Indiana county incidence exists only from V3.
+  - Demographics race categories only partially map to the incidence/mortality vocabulary; unmappable categories remain topic-local.
+
+terminology:
+  preferred:
+    vintage: a distinct set of upstream SCP estimates, identified by content
+    release: a dated scrape published as a GitHub release; several releases may capture one vintage
+    suppression: upstream withholding of a cell (small-count or state-law)
+    harmonized view: the derived cross-vintage artifact; never a modification of release bytes
+    stratum: one (site x race x sex x age x stage x areatype) query combination
+  forbidden:
+    - version (ambiguous; use vintage or release)
+    - snapshot (use capture or release)
+  synonyms:
+    capture: release
+
+style:
+  tone: descriptive, restrained; data descriptor genre — no analysis, no conclusions
+  voice: active
+  audience: cancer surveillance researchers, health geographers, data engineers
+
+constraints:
+  preserve_citations: true
+  preserve_statistics: true
+  avoid_hype: true
+
+bibliography:
+  path: refs.bib
