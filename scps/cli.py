@@ -133,6 +133,7 @@ def scrape(
     catalog_path = catalog_path or (output_dir / DEFAULT_CATALOG_FILENAME)
 
     catalog = catalog_mod.Catalog.load(catalog_path)
+    _migrate_mortality_stage(catalog)
     if refresh_catalog:
         # Refresh only the *selected* endpoints' entries — preserve others so a
         # targeted refresh (e.g. -d risk --refresh-catalog) doesn't wipe the
@@ -189,6 +190,38 @@ def scrape(
     if catalog_driven:
         _probe_new_ids(catalog, selected, risk_options, demo_options)
         _fail_on_regressions(catalog, selected, run_date)
+
+
+def _migrate_mortality_stage(catalog: catalog_mod.Catalog) -> None:
+    """Drop the phantom stage dimension from mortality catalog entries (#43).
+
+    Catalogs written before the fix carry stage=211/999 pairs per mortality
+    combo; without this migration the shrunk combo space would trip the
+    regression oracle. One-time surgery; a no-op on migrated catalogs.
+    """
+    merged: dict = {}
+    changed = False
+    keep: list = []
+    for entry in catalog.entries:
+        if entry.endpoint != "mortality" or "stage" not in entry.combo:
+            keep.append(entry)
+            continue
+        changed = True
+        entry.combo = {k: v for k, v in entry.combo.items() if k != "stage"}
+        key = tuple(sorted(entry.combo.items()))
+        prior = merged.get(key)
+        if prior is None:
+            merged[key] = entry
+            keep.append(entry)
+        else:
+            prior.last_seen = max(prior.last_seen, entry.last_seen)
+    if changed:
+        removed = len(catalog.entries) - len(keep)
+        catalog.entries = keep
+        logger.info(
+            "Migrated mortality catalog entries: stage dimension removed, "
+            "%d duplicate entries merged.", removed,
+        )
 
 
 def _fail_on_regressions(

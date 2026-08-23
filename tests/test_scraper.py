@@ -383,3 +383,66 @@ def test_get_table_death_url():
 
     assert len(captured_urls) == 1
     assert "deathrates" in captured_urls[0]
+
+
+# ---------------------------------------------------------------------------
+# stage is not a deathrates dimension (#43)
+# ---------------------------------------------------------------------------
+
+def test_death_url_has_no_stage_and_no_stage_column():
+    captured_urls = []
+
+    def mock_fetch(url):
+        captured_urls.append(url)
+        return _report(
+            "County,FIPS," + _DEATH_RATE,
+            ['"Test County, Virginia",51001,50.0'],
+        )
+
+    with patch.object(scraper, "fetch_report", side_effect=mock_fetch):
+        df = scraper.get_table(_type="death", stage="211")
+
+    assert "stage=" not in captured_urls[0]
+    assert "stage" not in df.columns
+
+
+def test_incidence_url_keeps_stage():
+    captured_urls = []
+
+    def mock_fetch(url):
+        captured_urls.append(url)
+        return _report(
+            "County,FIPS," + _INCD_RATE,
+            ['"Test County, Virginia",51001,100.0'],
+        )
+
+    with patch.object(scraper, "fetch_report", side_effect=mock_fetch):
+        df = scraper.get_table(_type="incd", stage="999")
+
+    assert "stage=999" in captured_urls[0]
+    assert "stage" in df.columns
+
+
+def test_master_table_dedupes_stage_for_death():
+    """Two combos differing only in stage → a single mortality fetch."""
+    calls = []
+
+    def fake_get_table(**kwargs):
+        calls.append(kwargs)
+        return pd.DataFrame(
+            {
+                "reported_locale": ["Somewhere County, CO"],
+                "fips": ["08001"],
+                "age_adjusted_death_raterate_note___deaths_per_100_000": [1.0],
+            }
+        )
+
+    combos = [
+        {"cancer": "001", "age": "001", "sex": "0", "race": "00", "stage": "999", "areatype": "county"},
+        {"cancer": "001", "age": "001", "sex": "0", "race": "00", "stage": "211", "areatype": "county"},
+    ]
+    with patch.object(scraper, "get_table", side_effect=fake_get_table):
+        scraper.master_table(_type="death", combos=combos)
+
+    assert len(calls) == 1
+    assert "stage" not in calls[0]

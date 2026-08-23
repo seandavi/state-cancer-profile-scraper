@@ -178,10 +178,13 @@ def get_table(
         rate_col = "age_adjusted_death_raterate_note___deaths_per_100_000"
         url_insert = "deathrates"
 
+    # stage is not a deathrates dimension — the site ignores the parameter
+    # and returns byte-identical payloads (#43). Never send it for mortality.
+    stage_param = "" if _type == "death" else f"&stage={stage}"
     url = (
         f"https://statecancerprofiles.cancer.gov/{url_insert}/index.php?stateFIPS={stateFIPS}"
         f"&areatype={areatype}&cancer={cancer}&race={race}"
-        f"&stage={stage}&year={year}"
+        f"{stage_param}&year={year}"
         f"&sex={sex}&age={age}&type={_type}&output=1"
     )
     logger.debug(url)
@@ -212,7 +215,8 @@ def get_table(
 
     df["year"] = get_text_from_select_id("year", year)
     df["sex"] = get_text_from_select_id("sex", sex)
-    df["stage"] = get_text_from_select_id("stage", stage)
+    if _type != "death":
+        df["stage"] = get_text_from_select_id("stage", stage)
     df["race"] = get_text_from_select_id("race", race)
     df["cancer"] = get_text_from_select_id("cancer", cancer)
     df["areatype"] = get_text_from_select_id("areatype", areatype)
@@ -309,6 +313,21 @@ def iter_incidence_combos(
                             }
 
 
+def _dedupe_death_combos(combos: Iterable[dict]) -> Iterator[dict]:
+    """Strip the stage dimension from mortality combos and dedupe.
+
+    stage is not a deathrates dimension (#43); iterating it doubled every
+    mortality request and mislabelled half the table as late-stage.
+    """
+    seen: set = set()
+    for combo in combos:
+        combo = {k: v for k, v in combo.items() if k != "stage"}
+        key = tuple(sorted(combo.items()))
+        if key not in seen:
+            seen.add(key)
+            yield combo
+
+
 def master_table(
     year: str = "0",
     stateFIPS: str = "00",
@@ -338,6 +357,9 @@ def master_table(
         cancers = list(select_options["cancer"].keys())
         logger.info(f"Number of cancers: {len(cancers)}")
         combos = iter_incidence_combos(select_options, areatypes)
+
+    if _type == "death":
+        combos = _dedupe_death_combos(combos)
 
     dflist = []
     for combo in combos:

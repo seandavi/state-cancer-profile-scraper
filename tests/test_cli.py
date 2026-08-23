@@ -306,3 +306,26 @@ def test_notes_file_written_when_master_table_carries_notes(tmp_path):
     notes_file = tmp_path / "notes_risk.txt"
     assert notes_file.exists()
     assert "Created by statecancerprofiles.cancer.gov" in notes_file.read_text()
+
+
+def test_mortality_catalog_migration_drops_stage_and_merges(tmp_path):
+    """Pre-#43 catalogs carry stage=999/211 pairs per mortality combo."""
+    from scps.cli import _migrate_mortality_stage
+    from scps import catalog as catalog_mod
+
+    cat = catalog_mod.Catalog(path=tmp_path / "c.jsonl")
+    base = {"cancer": "001", "age": "001", "sex": "0", "race": "00", "areatype": "county"}
+    cat.entries = [
+        catalog_mod.CatalogEntry("mortality", {**base, "stage": "999"}, 10, "2026-01-01", "2026-01-01"),
+        catalog_mod.CatalogEntry("mortality", {**base, "stage": "211"}, 10, "2026-01-01", "2026-02-01"),
+        catalog_mod.CatalogEntry("incidence", {**base, "stage": "211"}, 10, "2026-01-01", "2026-01-01"),
+    ]
+    _migrate_mortality_stage(cat)
+
+    mort = [e for e in cat.entries if e.endpoint == "mortality"]
+    assert len(mort) == 1
+    assert "stage" not in mort[0].combo
+    assert mort[0].last_seen == "2026-02-01"  # max of the merged pair
+    # Incidence untouched — stage is a real dimension there.
+    inc = [e for e in cat.entries if e.endpoint == "incidence"]
+    assert inc[0].combo["stage"] == "211"
