@@ -13,4 +13,4 @@ scrape.log
 README_files
 README.html
 .coverage
-coverage.xml
+coverage.xml.env
