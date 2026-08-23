@@ -95,6 +95,10 @@ for r in rows:
 ```
 
 <!-- To add, each as a chunk:
+- mortality row counts in historical releases (V1-V3) MUST be deduplicated
+  first: the stage dimension is phantom for mortality and 50% of rows are
+  duplicates carrying a wrong late-stage label (issue #43; fixed from the
+  first post-hardening release);
 - vintage-boundary revision fractions (~98%) recomputed from the deposits;
 - suppression census (post-hardening releases) by state and reason;
 - coverage table: Kansas incidence absence, Indiana V3 return, V1 gaps;

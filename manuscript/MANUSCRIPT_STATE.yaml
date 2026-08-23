@@ -39,6 +39,7 @@ known_weaknesses:
   - Vintage boundaries are bracketed by release gaps, not dated; intermediate upstream vintages could have gone uncaptured.
   - Historical releases (V1-V3) are CSV-only and dropped suppressed rows; suppression there is recoverable only by cross-product differencing.
   - Kansas county incidence is absent in every vintage; Indiana county incidence exists only from V3.
+  - Historical mortality tables are 50% duplicated (phantom stage dimension); rows labelled late-stage there carry all-stages rates. Fixed prospectively; historical counts must be deduplicated.
   - Demographics race categories only partially map to the incidence/mortality vocabulary; unmappable categories remain topic-local.
 
 terminology:
