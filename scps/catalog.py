@@ -139,6 +139,20 @@ class Catalog:
                 fh.write(json.dumps(payload) + "\n")
         logger.info("Wrote %d catalog entries to %s", len(self.entries), self.path)
 
+    def unseen_since(self, endpoint: str, run_date: str) -> list[CatalogEntry]:
+        """Entries for ``endpoint`` not re-confirmed on/after ``run_date``.
+
+        In a catalog-driven run every recorded combo is attempted, so an
+        entry whose ``last_seen`` predates the run is a combo that returned
+        data last time and failed this time — a regression, not dead space
+        (#38). ISO dates compare lexicographically.
+        """
+        return [
+            e
+            for e in self.entries
+            if e.endpoint == endpoint and e.last_seen < run_date
+        ]
+
     def truncate(self) -> None:
         """Empty the in-memory entries and the on-disk file (used by refresh)."""
         self.entries = []

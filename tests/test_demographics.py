@@ -93,39 +93,60 @@ topic_box_array["ed"] = "Education";
 # get_demographics_table URL construction & normalization
 # ---------------------------------------------------------------------------
 
-def _fake_county_csv_dataframe():
-    return pd.DataFrame(
-        {
-            "county": ["United States", "Some County, TX"],
-            "fips": ["00000", "48001"],
-            "2023_rural_urban_continuum_codesrural_urban_note": ["N/A", "Rural"],
-            "value_percent": [3.4, 0.5],
-            "households_with_1_person_per_room": [4449577, 12],
-            "rank_within_us": ["N/A", "100 of 3143"],
-        }
+_DEMO_COUNTY_HEADER = (
+    "County,FIPS,2023 Rural-Urban Continuum Codes([rural urban note]),"
+    '"Value (Percent)","Households (with 1 Person Per Room)",Rank within US'
+)
+
+_DEMO_HSA_HEADER = (
+    "Health Service Area,HSA_Code,"
+    '"Value (Percent)","Households (with 1 Person Per Room)",Rank within US'
+)
+
+
+def _demo_report(header, rows):
+    return "\n".join(
+        [
+            "Demographics Report",
+            "",
+            '"Households with >1 Person Per Room, 2019-2023"',
+            "",
+            header,
+            *rows,
+            "",
+            "Created by statecancerprofiles.cancer.gov on 08/23/2026 11:36 am.",
+        ]
     )
 
 
-def _fake_hsa_csv_dataframe():
-    return pd.DataFrame(
-        {
-            "health_service_area": ["United States", "Jackson, CO"],
-            "hsa_code": ["00000", "0771"],
-            "value_percent": [3.4, 0.0],
-            "households_with_1_person_per_room": [4449577, 0],
-            "rank_within_us": ["N/A", "1 of 950"],
-        }
+def _county_payload():
+    return _demo_report(
+        _DEMO_COUNTY_HEADER,
+        [
+            '"United States",00000,N/A,3.4,4449577,N/A',
+            '"Some County, TX",48001,Rural,0.5,12,100 of 3143',
+        ],
+    )
+
+
+def _hsa_payload():
+    return _demo_report(
+        _DEMO_HSA_HEADER,
+        [
+            '"United States",00000,3.4,4449577,N/A',
+            '"Jackson, CO",0771,0.0,0,1 of 950',
+        ],
     )
 
 
 def test_get_demographics_table_builds_expected_url():
     captured = []
 
-    def fake_read_csv(url, **_kwargs):
+    def fake_fetch(url):
         captured.append(url)
-        return _fake_county_csv_dataframe()
+        return _county_payload()
 
-    with patch("pandas.read_csv", side_effect=fake_read_csv):
+    with patch.object(demographics, "fetch_report", side_effect=fake_fetch):
         demographics.get_demographics_table(
             topic="crowd", demo="00027", areatype="county"
         )
@@ -140,7 +161,7 @@ def test_get_demographics_table_builds_expected_url():
 
 
 def test_get_demographics_table_normalizes_county_columns():
-    with patch("pandas.read_csv", return_value=_fake_county_csv_dataframe()):
+    with patch.object(demographics, "fetch_report", return_value=_county_payload()):
         df = demographics.get_demographics_table(
             topic="crowd", demo="00027", areatype="county"
         )
@@ -157,7 +178,7 @@ def test_get_demographics_table_normalizes_county_columns():
 
 def test_get_demographics_table_normalizes_hsa_columns():
     """HSA areatype uses ``Health Service Area`` / ``HSA_Code`` headers."""
-    with patch("pandas.read_csv", return_value=_fake_hsa_csv_dataframe()):
+    with patch.object(demographics, "fetch_report", return_value=_hsa_payload()):
         df = demographics.get_demographics_table(
             topic="crowd", demo="00027", areatype="hsa"
         )

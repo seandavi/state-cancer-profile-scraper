@@ -151,3 +151,39 @@ def test_probe_new_ids_scoped_to_endpoint():
     # if we're checking the risk endpoint.
     new = catalog_mod.probe_new_ids(cat, "risk", ["crowd"], "topic")
     assert new == {"crowd"}
+
+
+def test_unseen_since_flags_regressed_combos(tmp_path):
+    cat = catalog_mod.Catalog(path=tmp_path / "c.jsonl")
+    cat.entries = [
+        catalog_mod.CatalogEntry(
+            endpoint="incidence",
+            combo={"cancer": "001"},
+            rows=10,
+            discovered="2026-01-01",
+            last_seen="2026-01-01",
+        ),
+        catalog_mod.CatalogEntry(
+            endpoint="incidence",
+            combo={"cancer": "071"},
+            rows=5,
+            discovered="2026-01-01",
+            last_seen="2026-01-01",
+        ),
+        catalog_mod.CatalogEntry(
+            endpoint="risk",
+            combo={"topic": "alcohol"},
+            rows=52,
+            discovered="2026-01-01",
+            last_seen="2026-01-01",
+        ),
+    ]
+    # This run re-confirms one incidence combo but not the other.
+    cat.record_success("incidence", {"cancer": "001"}, 10)
+
+    run_date = cat.entries[0].last_seen  # today's date, per record_success
+    regressed = cat.unseen_since("incidence", run_date)
+    assert [e.combo for e in regressed] == [{"cancer": "071"}]
+    # Other endpoints are judged independently.
+    assert len(cat.unseen_since("risk", run_date)) == 1
+    assert cat.unseen_since("demographics", run_date) == []

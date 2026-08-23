@@ -26,6 +26,9 @@ options are not valid for some of the other options.
 
 """
 
+import csv
+import functools
+import io
 from collections.abc import Callable, Iterable, Iterator
 
 import httpx
@@ -87,7 +90,74 @@ def column_text_replace(txt: str) -> str:
     )
 
 
-select_opts = get_select_options()
+@functools.lru_cache(maxsize=1)
+def select_options() -> dict:
+    """Cached select-option vocabulary, fetched on first use.
+
+    Importing this module must not perform network I/O (#37); anything that
+    needs the vocabulary calls this instead of a module-level constant.
+    """
+    return get_select_options()
+
+
+# "*" is deliberately NOT treated as NA at read time: it marks a suppressed
+# cell and is decoded into `suppression_reason` before numeric coercion (#35).
+NA_VALUES = ["N/A", " N/A", "N/A ", " N/A "]
+
+# Every SCP export names its area-code column one of these; the header line
+# is located by content, not by a fixed offset (#36).
+_KEY_FIELDS = {"FIPS", "HSA_Code"}
+
+
+def fetch_report(url: str) -> str:
+    """GET one SCP CSV export and return the raw text."""
+    resp = httpx.get(url, timeout=60.0)
+    resp.raise_for_status()
+    return resp.text
+
+
+def split_report(text: str) -> tuple[str, str]:
+    """Split a raw SCP export into ``(data_csv, notes)``.
+
+    The payload is a report: a title block, the CSV data block, then
+    footnotes. The data block is located by finding the header line by
+    content (it contains a FIPS/HSA_Code field) and reading until the next
+    blank line — upstream can grow or shrink the title block without
+    breaking us, which is what killed cancerprof's fixed-offset parser.
+    ``notes`` is the title block plus the footnotes, verbatim: it carries
+    the "Created by statecancerprofiles.cancer.gov on DATE" vintage string,
+    the submission year, and the suppression-rule definitions.
+    """
+    lines = text.splitlines()
+    header_idx = None
+    for i, line in enumerate(lines):
+        if "FIPS" not in line and "HSA_Code" not in line:
+            continue
+        fields = next(csv.reader([line]), [])
+        if any(f.strip() in _KEY_FIELDS for f in fields):
+            header_idx = i
+            break
+    if header_idx is None:
+        raise ValueError("no data-block header line found in SCP payload")
+    end = header_idx + 1
+    while end < len(lines) and lines[end].strip():
+        end += 1
+    data_csv = "\n".join(lines[header_idx:end])
+    notes = "\n".join(lines[:header_idx] + lines[end:]).strip()
+    return data_csv, notes
+
+
+def decode_suppression(raw: "pd.Series") -> "pd.Series":
+    """Map raw value-column strings to a suppression-reason column.
+
+    SCP marks small-count suppression with ``*`` and state-law withholding
+    (Kansas counties) with ``[P1 note]``. Everything else → <NA>.
+    """
+    stripped = raw.astype("string").str.strip()
+    reason = pd.Series(pd.NA, index=raw.index, dtype="string")
+    reason[stripped == "*"] = "suppressed_small_count"
+    reason[stripped.str.startswith("[P1", na=False)] = "withheld_state_law"
+    return reason
 
 
 def get_table(
@@ -116,11 +186,11 @@ def get_table(
     )
     logger.debug(url)
 
+    data_csv, notes = split_report(fetch_report(url))
     df = pd.read_csv(
-        url,
-        skiprows=8,
+        io.StringIO(data_csv),
         low_memory=False,
-        na_values=["*", "N/A", " N/A", "N/A ", " N/A "],
+        na_values=NA_VALUES,
         skipinitialspace=True,
         dtype={"FIPS": str},
     )
@@ -138,7 +208,7 @@ def get_table(
         df = df.rename(columns={"state": "reported_locale"})
 
     def get_text_from_select_id(group, id):
-        return select_opts[group][id]
+        return select_options()[group][id]
 
     df["year"] = get_text_from_select_id("year", year)
     df["sex"] = get_text_from_select_id("sex", sex)
@@ -181,6 +251,7 @@ def get_table(
     df["_extracted_at"] = pd.Timestamp.now().isoformat()
     # to allow for easy linkout to the website
     df["url"] = url.replace("&output=1", "")
+    df["suppression_reason"] = decode_suppression(df[rate_col])
     for numeric_column in [
         rate_col,
         "lower_95pct_confidence_interval",
@@ -198,7 +269,12 @@ def get_table(
             logger.debug("Caught an expected exception, so ignoring")
             logger.debug(e)
             pass
-    return df[df[rate_col].notna()]
+    # Keep suppressed rows (typed-null rate + reason); drop only rows that
+    # are neither numeric nor suppressed — the "N/A" not-available cases the
+    # old rate-notna filter existed for.
+    df = df[df[rate_col].notna() | df["suppression_reason"].notna()]
+    df.attrs["scp_notes"] = notes
+    return df
 
 
 def iter_incidence_combos(
@@ -275,6 +351,11 @@ def master_table(
         except Exception as e:
             logger.debug("Caught an exception, but ignoring it")
             logger.debug(e)
+    # concat() drops .attrs; carry the first fetch's notes block forward so
+    # the CLI can persist it (vintage string lives there — see #36).
+    notes = next(
+        (d.attrs["scp_notes"] for d in dflist if d.attrs.get("scp_notes")), None
+    )
     df = pd.concat(dflist)
     # Split "Galax City, Virginia(2)" → ("Galax City", "Virginia") for county
     # rows. State-level rows have no comma (e.g. "California") and split into
@@ -309,6 +390,8 @@ def master_table(
         inplace=True,
     )
     df = df.loc[:, ~df.columns.str.startswith("met_")]
+    if notes:
+        df.attrs["scp_notes"] = notes
     return df
 
 

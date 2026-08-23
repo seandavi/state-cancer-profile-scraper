@@ -93,46 +93,57 @@ def test_get_select_options_age_has_pediatric_options():
 # Tests for get_table URL construction
 # ---------------------------------------------------------------------------
 
-def _make_mock_dataframe_csv():
-    """Return a minimal CSV string matching the expected structure."""
-    header_rows = "\n" * 8  # scraper skips first 8 rows
-    csv_content = (
-        "County,FIPS,Rural Urban,Age Adjusted Incidence Rate(rate note) - Cases per 100,000,"
-        "Lower 95% Confidence Interval,Upper 95% Confidence Interval,"
-        "CI Rank(rank note),Lower CI (CI Rank),Upper CI (CI Rank),"
-        "Average Annual Count,Recent Trend,Recent 5-Year Trend (trend note) in Incidence Rates,"
-        "Lower 95% Confidence Interval,Upper 95% Confidence Interval\n"
-        "Test County, Virginia,51000,Urban,100.0,90.0,110.0,1,1,5,50,stable,1.0,0.5,1.5\n"
+_INCD_RATE = '"Age-Adjusted Incidence Rate([rate note]) - cases per 100,000"'
+_DEATH_RATE = '"Age-Adjusted Death Rate([rate note]) - deaths per 100,000"'
+
+# Full county header as served live (2026-08), including the 2023 RUCC column
+# that broke position-based parsers.
+COUNTY_HEADER = (
+    "County,FIPS,2023 Rural-Urban Continuum Codes([rural urban note]),"
+    + _INCD_RATE
+    + ',"Lower 95% Confidence Interval","Upper 95% Confidence Interval",'
+    '"CI*Rank([rank note])","Lower CI (CI*Rank)","Upper CI (CI*Rank)",'
+    "Average Annual Count,Recent Trend,"
+    '"Recent 5-Year Trend ([trend note]) in Incidence Rates",'
+    '"Lower 95% Confidence Interval","Upper 95% Confidence Interval"'
+)
+
+
+def _report(header, rows, title_lines=None):
+    """Assemble a raw SCP export: title block, data block, footnotes."""
+    title = title_lines or [
+        "Incidence Rate Report for United States by County",
+        "",
+        '"All Cancer Sites (All Stages^), 2018-2022"',
+        "",
+        "Sorted by Rate",
+        "",
+    ]
+    return "\n".join(
+        [
+            *title,
+            header,
+            *rows,
+            "",
+            "Created by statecancerprofiles.cancer.gov on 08/23/2026 11:30 am.",
+            '"* Data has been suppressed to ensure confidentiality and stability of rate estimates."',
+            '"(1) Source: NPCR and SEER. Based on the 2024 submission."',
+        ]
     )
-    return header_rows + csv_content
 
 
 def test_get_table_uses_correct_url():
     """get_table should build a URL with the expected query parameters."""
     captured_urls = []
 
-    def mock_read_csv(url, **kwargs):
+    def mock_fetch(url):
         captured_urls.append(url)
-        import pandas as pd
-        # Return a minimal DataFrame with required columns
-        data = {
-            "county": ["Test County, Virginia"],
-            "fips": ["51001"],
-            "age_adjusted_incidence_raterate_note___cases_per_100_000": [100.0],
-            "lower_95pct_confidence_interval": [90.0],
-            "upper_95pct_confidence_interval": [110.0],
-            "ci_rankrank_note": ["1"],
-            "lower_ci_ci_rank": [1],
-            "upper_ci_ci_rank": [5],
-            "average_annual_count": [50],
-            "recent_trend": ["stable"],
-            "recent_5_year_trend_trend_note_in_incidence_rates": [1.0],
-            "lower_95pct_confidence_interval_1": [0.5],
-            "upper_95pct_confidence_interval_1": [1.5],
-        }
-        return pd.DataFrame(data)
+        return _report(
+            "County,FIPS," + _INCD_RATE,
+            ['"Test County, Virginia",51001,100.0'],
+        )
 
-    with patch("pandas.read_csv", side_effect=mock_read_csv):
+    with patch.object(scraper, "fetch_report", side_effect=mock_fetch):
         scraper.get_table(
             year="0",
             stateFIPS="00",
@@ -152,6 +163,72 @@ def test_get_table_uses_correct_url():
     assert "areatype=county" in url
     assert "incidencerates" in url
     assert "output=1" in url
+
+
+# ---------------------------------------------------------------------------
+# split_report: content-based data-block location
+# ---------------------------------------------------------------------------
+
+def test_split_report_locates_data_by_content():
+    """The data block is found by its header line, not by a fixed offset."""
+    rows = ['"Test County, Virginia",51001,100.0']
+    short = _report("County,FIPS," + _INCD_RATE, rows, title_lines=["Tiny", ""])
+    long_title = ["Line %d" % i for i in range(12)] + [""]
+    long = _report("County,FIPS," + _INCD_RATE, rows, title_lines=long_title)
+
+    for payload in (short, long):
+        data_csv, notes = scraper.split_report(payload)
+        assert data_csv.splitlines()[0].startswith("County,FIPS")
+        assert len(data_csv.splitlines()) == 2
+        assert "Created by statecancerprofiles.cancer.gov" in notes
+        assert "2024 submission" in notes
+
+
+def test_split_report_raises_without_header():
+    import pytest
+
+    with pytest.raises(ValueError):
+        scraper.split_report("Just a title\n\nNo data here\n")
+
+
+# ---------------------------------------------------------------------------
+# Suppression decoding (#35)
+# ---------------------------------------------------------------------------
+
+def test_get_table_keeps_suppressed_rows_with_reason():
+    """Suppressed cells become typed nulls + a reason; N/A rows still drop."""
+    rows = [
+        '"Mason County(7)",53045,Rural,66.9 ,60, 74.5,1 , 1 , 6,74,falling,-1.5 ,-2.0, -0.9',
+        '"Garfield County(2)",53023,Rural,* ,*, *,* , * , *,3 or fewer,*,*,*,*',
+        '"Cheyenne County(2)",20023,Rural,[P1 note] ,N/A, N/A,N/A , N/A , N/A,N/A,N/A,N/A,N/A,N/A',
+        '"Nowhere County(1)",99001,Rural,N/A ,N/A, N/A,N/A , N/A , N/A,N/A,N/A,N/A,N/A,N/A',
+    ]
+    payload = _report(COUNTY_HEADER, rows)
+
+    with patch.object(scraper, "fetch_report", return_value=payload):
+        df = scraper.get_table(areatype="county")
+
+    rate_col = "age_adjusted_incidence_raterate_note___cases_per_100_000"
+    by_fips = df.set_index("fips")
+    # The N/A-rate row is dropped; numeric + both suppressed rows survive.
+    assert set(by_fips.index) == {"53045", "53023", "20023"}
+    assert by_fips.loc["53045", rate_col] == 66.9
+    assert pd.isna(by_fips.loc["53045", "suppression_reason"])
+    assert pd.isna(by_fips.loc["53023", rate_col])
+    assert by_fips.loc["53023", "suppression_reason"] == "suppressed_small_count"
+    assert pd.isna(by_fips.loc["20023", rate_col])
+    assert by_fips.loc["20023", "suppression_reason"] == "withheld_state_law"
+    # The RUCC column passes through under its normalized name.
+    assert "2023_rural_urban_continuum_codesrural_urban_note" in df.columns
+
+
+def test_get_table_attaches_notes():
+    payload = _report(
+        "County,FIPS," + _INCD_RATE, ['"Test County, Virginia",51001,100.0']
+    )
+    with patch.object(scraper, "fetch_report", return_value=payload):
+        df = scraper.get_table(areatype="county")
+    assert "Created by statecancerprofiles.cancer.gov" in df.attrs["scp_notes"]
 
 
 def test_master_table_iterates_areatypes():
@@ -231,32 +308,21 @@ def test_get_table_handles_state_areatype_response():
     Regression for the bug where state-areatype combos silently failed because
     df["county"] raised KeyError and master_table swallowed it.
     """
-    state_csv = pd.DataFrame(
-        {
-            "state": [
-                "California",
-                "Texas",
-                "District of Columbia",  # 11001 — 5-char non-000 FIPS, still state
-                "Alaska",                # 02900 — aggregated registry, special FIPS
-            ],
-            "fips": ["06000", "48000", "11001", "02900"],
-            "age_adjusted_incidence_raterate_note___cases_per_100_000": [
-                400.0, 410.0, 420.0, 430.0,
-            ],
-            "lower_95pct_confidence_interval": [395.0, 405.0, 415.0, 425.0],
-            "upper_95pct_confidence_interval": [405.0, 415.0, 425.0, 435.0],
-            "ci_rankrank_note": ["1", "2", "3", "4"],
-            "lower_ci_ci_rank": [1, 2, 3, 4],
-            "upper_ci_ci_rank": [3, 4, 5, 6],
-            "average_annual_count": [100000, 90000, 5000, 3000],
-            "recent_trend": ["stable"] * 4,
-            "recent_5_year_trend_trend_note_in_incidence_rates": [0.1, 0.2, 0.0, -0.1],
-            "lower_95pct_confidence_interval_1": [0.0, 0.1, -0.1, -0.2],
-            "upper_95pct_confidence_interval_1": [0.2, 0.3, 0.1, 0.0],
-        }
+    # State-level responses carry no RUCC column (which is exactly why
+    # cancerprof's state calls still work).
+    payload = _report(
+        "State,FIPS," + _INCD_RATE,
+        [
+            '"California",06000,400.0',
+            '"Texas",48000,410.0',
+            # 11001 — 5-char non-000 FIPS, still state
+            '"District of Columbia",11001,420.0',
+            # 02900 — aggregated registry, special FIPS
+            '"Alaska",02900,430.0',
+        ],
     )
 
-    with patch("pandas.read_csv", return_value=state_csv):
+    with patch.object(scraper, "fetch_report", return_value=payload):
         df = scraper.get_table(areatype="state")
 
     assert "reported_locale" in df.columns
@@ -275,24 +341,19 @@ def test_get_table_locale_type_from_fips_shape():
     state-aggregate row (FIPS XX000) embedded in a county-view response is
     labeled "state".
     """
-    mixed_csv = pd.DataFrame(
-        {
-            "county": [
-                "United States",                  # 00000 → national
-                "California",                     # 06000 → state aggregate row
-                "Iberville Parish, Louisiana",    # 22047 → county-equivalent
-                "Lake and Peninsula Borough, AK", # 02164 → county-equivalent
-                "Galax City, Virginia",           # 51640 → county-equivalent (city)
-                "Plain County, Anywhere",         # 12345 → traditional county
-            ],
-            "fips": ["00000", "06000", "22047", "02164", "51640", "12345"],
-            "age_adjusted_incidence_raterate_note___cases_per_100_000": [
-                1.0, 2.0, 3.0, 4.0, 5.0, 6.0
-            ],
-        }
+    payload = _report(
+        "County,FIPS," + _INCD_RATE,
+        [
+            '"United States",00000,1.0',                   # 00000 → national
+            '"California",06000,2.0',                      # state aggregate row
+            '"Iberville Parish, Louisiana",22047,3.0',     # county-equivalent
+            '"Lake and Peninsula Borough, AK",02164,4.0',  # county-equivalent
+            '"Galax City, Virginia",51640,5.0',            # county-equivalent (city)
+            '"Plain County, Anywhere",12345,6.0',          # traditional county
+        ],
     )
 
-    with patch("pandas.read_csv", return_value=mixed_csv):
+    with patch.object(scraper, "fetch_report", return_value=payload):
         df = scraper.get_table(areatype="county")
 
     by_fips = dict(zip(df["fips"], df["locale_type"]))
@@ -310,27 +371,14 @@ def test_get_table_death_url():
     """get_table with _type='death' should use the deathrates endpoint."""
     captured_urls = []
 
-    def mock_read_csv(url, **kwargs):
+    def mock_fetch(url):
         captured_urls.append(url)
-        import pandas as pd
-        data = {
-            "county": ["Test County, Virginia"],
-            "fips": ["51001"],
-            "age_adjusted_death_raterate_note___deaths_per_100_000": [50.0],
-            "lower_95pct_confidence_interval": [40.0],
-            "upper_95pct_confidence_interval": [60.0],
-            "ci_rankrank_note": ["2"],
-            "lower_ci_ci_rank": [1],
-            "upper_ci_ci_rank": [5],
-            "average_annual_count": [20],
-            "recent_trend": ["falling"],
-            "recent_5_year_trend_trend_note_in_death_rates": [-1.0],
-            "lower_95pct_confidence_interval_1": [-1.5],
-            "upper_95pct_confidence_interval_1": [-0.5],
-        }
-        return pd.DataFrame(data)
+        return _report(
+            "County,FIPS," + _DEATH_RATE,
+            ['"Test County, Virginia",51001,50.0'],
+        )
 
-    with patch("pandas.read_csv", side_effect=mock_read_csv):
+    with patch.object(scraper, "fetch_report", side_effect=mock_fetch):
         scraper.get_table(_type="death")
 
     assert len(captured_urls) == 1

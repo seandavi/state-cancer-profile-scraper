@@ -56,27 +56,41 @@ def test_parse_risk_defines_skips_placeholder_choice_entries():
 # get_risk_table URL construction & metadata enrichment
 # ---------------------------------------------------------------------------
 
-def _fake_risk_csv_dataframe():
-    return pd.DataFrame(
-        {
-            "state": ["United States", "District of Columbia", "Montana"],
-            "fips": ["00000", "11001", "30000"],
-            "percent2": [15.6, 25.5, 20.3],
-            "lower_95pct_confidence_interval": [pd.NA, 23.5, 18.9],
-            "upper_95pct_confidence_interval": [pd.NA, 27.6, 21.6],
-            "number_of_respondents_with_screening_or_risk_factor": [pd.NA, 536, 946],
-        }
+_RISK_HEADER = (
+    "State,FIPS,Percent2,"
+    '"Lower 95% Confidence Interval","Upper 95% Confidence Interval",'
+    '"Number of Respondents (with Screening or Risk Factor)"'
+)
+
+
+def _risk_report(header=_RISK_HEADER, rows=None):
+    rows = rows or [
+        '"United States",00000,15.6,N/A,N/A,N/A',
+        '"District of Columbia",11001,25.5,23.5,27.6,536',
+        '"Montana",30000,20.3,18.9,21.6,946',
+    ]
+    return "\n".join(
+        [
+            "Screening and Risk Factors Report",
+            "",
+            '"Binge Drinking, 2020-2022"',
+            "",
+            header,
+            *rows,
+            "",
+            "Created by statecancerprofiles.cancer.gov on 08/23/2026 11:35 am.",
+        ]
     )
 
 
 def test_get_risk_table_builds_expected_url():
     captured = []
 
-    def fake_read_csv(url, **_kwargs):
+    def fake_fetch(url):
         captured.append(url)
-        return _fake_risk_csv_dataframe()
+        return _risk_report()
 
-    with patch("pandas.read_csv", side_effect=fake_read_csv):
+    with patch.object(risk, "fetch_report", side_effect=fake_fetch):
         risk.get_risk_table(topic="alcohol", risk="v505", statefips="00")
 
     assert len(captured) == 1
@@ -96,7 +110,7 @@ def test_get_risk_table_normalizes_columns_and_adds_metadata():
         "sex": {"0": "Both Sexes"},
         "datatype": {"0": "Direct Estimates"},
     }
-    with patch("pandas.read_csv", return_value=_fake_risk_csv_dataframe()):
+    with patch.object(risk, "fetch_report", return_value=_risk_report()):
         df = risk.get_risk_table(
             topic="alcohol", risk="v505", statefips="00", options=options
         )
@@ -116,21 +130,32 @@ def test_get_risk_table_normalizes_columns_and_adds_metadata():
 
 
 def test_get_risk_table_county_breakdown_uses_county_column():
-    county_df = pd.DataFrame(
-        {
-            "county": ["Some County, TX"],
-            "fips": ["48001"],
-            "percent2": [10.0],
-            "lower_95pct_confidence_interval": [9.0],
-            "upper_95pct_confidence_interval": [11.0],
-            "number_of_respondents_with_screening_or_risk_factor": [42],
-        }
+    payload = _risk_report(
+        header=_RISK_HEADER.replace("State,FIPS", "County,FIPS"),
+        rows=['"Some County, TX",48001,10.0,9.0,11.0,42'],
     )
-    with patch("pandas.read_csv", return_value=county_df):
+    with patch.object(risk, "fetch_report", return_value=payload):
         df = risk.get_risk_table(topic="alcohol", risk="v505", statefips="99")
 
     assert "reported_locale" in df.columns
     assert df["locale_type"].iloc[0] == "county"
+
+
+def test_get_risk_table_decodes_suppression():
+    payload = _risk_report(
+        rows=[
+            '"Montana",30000,20.3,18.9,21.6,946',
+            '"Wyoming",56000,* ,*, *,*',
+        ]
+    )
+    with patch.object(risk, "fetch_report", return_value=payload):
+        df = risk.get_risk_table(topic="alcohol", risk="v505", statefips="00")
+
+    by_fips = df.set_index("fips")
+    assert by_fips.loc["30000", "percent"] == 20.3
+    assert pd.isna(by_fips.loc["30000", "suppression_reason"])
+    assert pd.isna(by_fips.loc["56000", "percent"])
+    assert by_fips.loc["56000", "suppression_reason"] == "suppressed_small_count"
 
 
 # ---------------------------------------------------------------------------
