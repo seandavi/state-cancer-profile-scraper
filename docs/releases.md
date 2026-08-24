@@ -1,5 +1,14 @@
 # Release inventory, vintage grouping, format coverage
 
+> **Definition — vintage.** A vintage is one *edition* of the upstream estimates: the
+> complete set of values statecancerprofiles.cancer.gov served during some period. When
+> NCI updates the underlying data (a new SEER/NPCR submission, revised population
+> denominators, a shifted five-year window), the site silently replaces the old values;
+> that replacement marks the boundary between one vintage and the next. Several dated
+> scrapes that captured identical values belong to one vintage. The term follows the
+> "real-time data" literature in economics, where a vintage is a statistical series as it
+> existed on a given date (Croushore & Stark).
+
 Covers SPEC Task 0 items 1, 2 (and item 4/5 live in `schema-drift.md` / `coverage-drift.md`).
 Audit performed 2026-08-23 against `seandavi/state-cancer-profile-scraper`. All 19 releases
 downloaded and analysed in full.
