@@ -17,12 +17,12 @@ import re
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
-import httpx
 import pandas as pd
 from bs4 import BeautifulSoup
 
 from scps.scraper import (
     NA_VALUES,
+    get_with_retry,
     column_text_replace,
     decode_suppression,
     fetch_report,
@@ -103,10 +103,10 @@ def get_risk_options() -> dict[str, Any]:
     ``statefips``, and ``datatype``. The ``risk_by_topic`` value is a nested
     ``{topic: {risk_id: label}}`` mapping parsed from ``riskJSDefines.js``.
     """
-    html = httpx.get(RISK_BASE_URL).text
+    html = get_with_retry(RISK_BASE_URL).text
     select_opts = _parse_select_options(html)
 
-    js_text = httpx.get(RISK_DEFINES_URL).text
+    js_text = get_with_retry(RISK_DEFINES_URL).text
     risk_by_topic = parse_risk_defines(js_text)
 
     return {

@@ -233,6 +233,7 @@ def test_risk_master_table_propagates_keyboard_interrupt():
 
 def test_get_risk_options_combines_html_and_js():
     html_response = MagicMock()
+    html_response.status_code = 200
     html_response.text = """
     <html><body>
       <select id="topic">
@@ -253,6 +254,7 @@ def test_get_risk_options_combines_html_and_js():
     </body></html>
     """
     js_response = MagicMock()
+    js_response.status_code = 200
     js_response.text = SAMPLE_RISK_JS
 
     def fake_get(url, *_a, **_k):
@@ -260,7 +262,7 @@ def test_get_risk_options_combines_html_and_js():
             return js_response
         return html_response
 
-    with patch("scps.risk.httpx.get", side_effect=fake_get):
+    with patch("scps.risk.get_with_retry", side_effect=fake_get):
         opts = risk.get_risk_options()
 
     assert opts["topic"] == {"alcohol": "Alcohol"}
