@@ -70,10 +70,11 @@ jobs:
 
     - name: Run scrape
       env:
-        # SCP's CDN throttles GitHub-hosted-runner IPs (~10-15s/request vs
-        # ~0.3s from a normal host), so CI needs more workers than the
-        # default 6 to fit the 6-hour job limit. See #45/#47.
-        SCPS_WORKERS: "16"
+        # SCP's CDN throttles GitHub-hosted-runner IPs; 16 workers caused
+        # silent request failures (half a release's rows lost, #47), so 8
+        # is the ceiling here. The durable fix is running the scrape off
+        # GitHub-hosted runners entirely.
+        SCPS_WORKERS: "8"
       run: uv run scps-scraper scrape ${{ steps.refresh.outputs.flag }}
 
     - name: Tag with gh_hash

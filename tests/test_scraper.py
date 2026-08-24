@@ -41,6 +41,7 @@ def test_column_text_replace_empty_string():
 
 def test_get_select_options_returns_dict():
     mock_response = MagicMock()
+    mock_response.status_code = 200
     mock_response.text = MOCK_SELECT_HTML
     with patch("httpx.get", return_value=mock_response):
         result = scraper.get_select_options()
@@ -50,6 +51,7 @@ def test_get_select_options_returns_dict():
 
 def test_get_select_options_expected_keys():
     mock_response = MagicMock()
+    mock_response.status_code = 200
     mock_response.text = MOCK_SELECT_HTML
     with patch("httpx.get", return_value=mock_response):
         result = scraper.get_select_options()
@@ -60,6 +62,7 @@ def test_get_select_options_expected_keys():
 
 def test_get_select_options_values_are_dicts():
     mock_response = MagicMock()
+    mock_response.status_code = 200
     mock_response.text = MOCK_SELECT_HTML
     with patch("httpx.get", return_value=mock_response):
         result = scraper.get_select_options()
@@ -70,6 +73,7 @@ def test_get_select_options_values_are_dicts():
 
 def test_get_select_options_cancer_values():
     mock_response = MagicMock()
+    mock_response.status_code = 200
     mock_response.text = MOCK_SELECT_HTML
     with patch("httpx.get", return_value=mock_response):
         result = scraper.get_select_options()
@@ -81,6 +85,7 @@ def test_get_select_options_cancer_values():
 def test_get_select_options_age_has_pediatric_options():
     """Age groups for pediatrics (015, 016) are added as a workaround."""
     mock_response = MagicMock()
+    mock_response.status_code = 200
     mock_response.text = MOCK_SELECT_HTML
     with patch("httpx.get", return_value=mock_response):
         result = scraper.get_select_options()

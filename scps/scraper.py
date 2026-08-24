@@ -45,7 +45,7 @@ logger = logging.getLogger("scps.scraper")
 def get_select_options() -> dict:
     """Get the select options from the state cancer profiles website"""
     soup = BeautifulSoup(
-        httpx.get(
+        get_with_retry(
             "https://statecancerprofiles.cancer.gov/incidencerates/index.php"
         ).text,
         "html.parser",
@@ -109,11 +109,38 @@ NA_VALUES = ["N/A", " N/A", "N/A ", " N/A "]
 _KEY_FIELDS = {"FIPS", "HSA_Code"}
 
 
+def get_with_retry(url: str, attempts: int = 5) -> httpx.Response:
+    """GET with exponential backoff on transient network/server errors.
+
+    Long scrapes hit transient ConnectErrors and 5xx from the upstream CDN
+    (#47); one blip must not kill a multi-hour run.
+    """
+    import time
+
+    last_exc: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            resp = httpx.get(url, timeout=60.0)
+            if resp.status_code >= 500:
+                raise httpx.HTTPStatusError(
+                    f"server error {resp.status_code}", request=resp.request, response=resp
+                )
+            resp.raise_for_status()
+            return resp
+        except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500:
+                raise
+            last_exc = exc
+            wait = 2**attempt
+            logger.warning("GET %s failed (%s); retry %d/%d in %ss",
+                           url[:80], exc, attempt + 1, attempts, wait)
+            time.sleep(wait)
+    raise last_exc
+
+
 def fetch_report(url: str) -> str:
     """GET one SCP CSV export and return the raw text."""
-    resp = httpx.get(url, timeout=60.0)
-    resp.raise_for_status()
-    return resp.text
+    return get_with_retry(url).text
 
 
 def split_report(text: str) -> tuple[str, str]:
@@ -354,13 +381,24 @@ def parallel_fetch(combos, fetch_one, on_success=None, workers=None):
             logger.debug("Skipped %s: %s", combo, exc)
             return combo, None
 
+    failures = 0
+    total = 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for combo, df in pool.map(_fetch, combos):
+            total += 1
             if df is None:
+                failures += 1
                 continue
             if on_success is not None:
                 on_success(combo, len(df))
             yield combo, df
+    if failures:
+        logger.warning(
+            "parallel_fetch: %d/%d combos returned no data "
+            "(invalid combos in discovery mode are normal; in catalog-driven "
+            "mode this is data loss and the regression check will fail).",
+            failures, total,
+        )
 
 
 def master_table(

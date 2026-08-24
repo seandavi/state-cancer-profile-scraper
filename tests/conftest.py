@@ -41,6 +41,8 @@ MOCK_SELECT_HTML = """
 """
 
 _mock_response = MagicMock()
+
+_mock_response.status_code = 200
 _mock_response.text = MOCK_SELECT_HTML
 
 with patch("httpx.get", return_value=_mock_response):

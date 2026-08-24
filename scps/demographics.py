@@ -16,12 +16,12 @@ import re
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
-import httpx
 import pandas as pd
 from bs4 import BeautifulSoup
 
 from scps.scraper import (
     NA_VALUES,
+    get_with_retry,
     column_text_replace,
     decode_suppression,
     fetch_report,
@@ -123,10 +123,10 @@ def _parse_select_options(html: str) -> dict[str, dict[str, str]]:
 
 def get_demographics_options() -> dict[str, Any]:
     """Discover demographics select options from the live website."""
-    html = httpx.get(DEMO_BASE_URL).text
+    html = get_with_retry(DEMO_BASE_URL).text
     select_opts = _parse_select_options(html)
 
-    js_text = httpx.get(DEMO_DEFINES_URL).text
+    js_text = get_with_retry(DEMO_DEFINES_URL).text
     demo_by_topic = parse_census_defines(js_text)
 
     return {
