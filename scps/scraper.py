@@ -260,6 +260,7 @@ def get_table(
         rate_col,
         "lower_95pct_confidence_interval",
         "upper_95pct_confidence_interval",
+        "ci_rankrank_note",
         "lower_ci_ci_rank",
         "upper_ci_ci_rank",
         "average_annual_count",

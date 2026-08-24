@@ -45,6 +45,16 @@ PARQUET_FILES = {
 DEFAULT_CATALOG_FILENAME = "scrape_catalog.jsonl"
 
 
+def _parquet_safe(df):
+    """Object columns concat'd from all-NA (float) and str combo-frames have
+    mixed types pyarrow cannot unify (#47). Cast them to the string dtype for
+    the parquet write; the CSV output is byte-identical either way."""
+    df = df.copy()
+    for col in df.columns[df.dtypes == object]:
+        df[col] = df[col].astype("string")
+    return df
+
+
 def _write_notes(df, endpoint: str, output_dir: Path) -> None:
     """Persist the SCP report notes (title + footnotes) for one endpoint.
 
@@ -287,7 +297,7 @@ def _run_incidence_or_mortality(
     df.to_csv(out, index=False, compression="gzip")
     parquet_out = output_dir / PARQUET_FILES[endpoint]
     logger.info("Writing %s", parquet_out)
-    df.to_parquet(parquet_out, index=False)
+    _parquet_safe(df).to_parquet(parquet_out, index=False)
     _write_notes(df, endpoint, output_dir)
 
 
@@ -312,7 +322,7 @@ def _run_risk(
     df.to_csv(out, index=False, compression="gzip")
     parquet_out = output_dir / PARQUET_FILES["risk"]
     logger.info("Writing %s", parquet_out)
-    df.to_parquet(parquet_out, index=False)
+    _parquet_safe(df).to_parquet(parquet_out, index=False)
     _write_notes(df, "risk", output_dir)
     return options
 
@@ -345,7 +355,7 @@ def _run_demographics(
     df.to_csv(out, index=False, compression="gzip")
     parquet_out = output_dir / PARQUET_FILES["demographics"]
     logger.info("Writing %s", parquet_out)
-    df.to_parquet(parquet_out, index=False)
+    _parquet_safe(df).to_parquet(parquet_out, index=False)
     _write_notes(df, "demographics", output_dir)
     return options
 
