@@ -12,7 +12,7 @@ project:
   source_format: quarto
 
 document_phase:
-  current: outline
+  current: draft
 
 core_claims:
   - >-
