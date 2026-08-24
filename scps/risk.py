@@ -22,7 +22,9 @@ from bs4 import BeautifulSoup
 
 from scps.scraper import (
     NA_VALUES,
+    find_defines_url,
     get_with_retry,
+    parse_defines,
     column_text_replace,
     decode_suppression,
     fetch_report,
@@ -33,47 +35,18 @@ from scps.scraper import (
 logger = logging.getLogger("scps.risk")
 
 RISK_BASE_URL = "https://statecancerprofiles.cancer.gov/risk/index.php"
-RISK_DEFINES_URL = "https://statecancerprofiles.cancer.gov/risk/riskJSDefines.js"
 
 # These placeholder values appear in the HTML selects as "--- choose X ---"
 # prompts and should never be used as real query parameters.
 _PLACEHOLDER_VALUES = {"*", "**", "***", "****", "*****"}
 
-# Matches lines like:  alcohol_array['v505']="Binge drinking ...";
-# Captures the topic, risk id, and label. Backreferences (\2 and \4) ensure
-# the closing quote matches the opening one, so apostrophes inside a
-# double-quoted label (e.g. "Men's Health") aren't treated as terminators.
-_RISK_LINE_RE = re.compile(
-    r"""^\s*(?P<topic>[a-z]+)_array\[(['"])(?P<risk>[^'"]+)\2\]\s*=\s*"""
-    r"""(['"])(?P<label>.*?)\4\s*;""",
-    re.MULTILINE,
-)
-
-
-# Matches /* ... */ block comments (non-greedy, multi-line).
-_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
-
 
 def parse_risk_defines(js_text: str) -> dict[str, dict[str, str]]:
-    """Parse ``riskJSDefines.js`` into ``{topic: {risk_id: label}}``.
+    """Parse the risk defines script into ``{topic: {risk_id: label}}``.
 
-    Both ``//`` line comments and ``/* ... */`` block comments are skipped,
-    and the placeholder ``'**'`` "choose risk factor" entry is excluded.
+    2026-08 upstream format: ``const risk_<topic> = [["id", "label"], ...]``.
     """
-    js_text = _BLOCK_COMMENT_RE.sub("", js_text)
-    result: dict[str, dict[str, str]] = {}
-    for raw_line in js_text.splitlines():
-        if raw_line.lstrip().startswith("//"):
-            continue
-        match = _RISK_LINE_RE.match(raw_line)
-        if not match:
-            continue
-        topic = match.group("topic")
-        risk = match.group("risk")
-        if risk in _PLACEHOLDER_VALUES:
-            continue
-        result.setdefault(topic, {})[risk] = match.group("label")
-    return result
+    return parse_defines(js_text, "risk_")
 
 
 def _parse_select_options(html: str) -> dict[str, dict[str, str]]:
@@ -106,7 +79,7 @@ def get_risk_options() -> dict[str, Any]:
     html = get_with_retry(RISK_BASE_URL).text
     select_opts = _parse_select_options(html)
 
-    js_text = get_with_retry(RISK_DEFINES_URL).text
+    js_text = get_with_retry(find_defines_url(html)).text
     risk_by_topic = parse_risk_defines(js_text)
 
     return {

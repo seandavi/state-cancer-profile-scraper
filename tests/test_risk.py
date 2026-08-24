@@ -13,19 +13,25 @@ from scps import risk
 # ---------------------------------------------------------------------------
 
 SAMPLE_RISK_JS = """
-var alcohol_array = new Array();
-alcohol_array['**']=CHOOSE_BEGINNING + "choose screening or risk factor" + CHOOSE_END;
-alcohol_array['v505']="Binge drinking, ages 21+";
-//alcohol_array['v501']="Mean number of alcoholic drinks per day, ages 21+";
+// For the risk listboxes (2026-08 upstream format).
+const risk_alcohol = [
+  ["v505", "Binge drinking, ages 21+"],
+];
+// const risk_old = [["v999", "Removed topic"]];
 
-var smoke_array = new Array();
-smoke_array['**']=CHOOSE_BEGINNING + "choose screening or risk factor" + CHOOSE_END;
-smoke_array["v19"]="Current Smoking; Ages 18+";
-smoke_array["v28"]="Smokers (Ever); Ages 18+";
+const risk_smoke = [
+  ["v19", "Current Smoking; Ages 18+"], // biased; note kept inline
+  ["v28", "Smokers (Ever); Ages 18+"],
+];
 
-var topic_arrays = new Array();
-topic_arrays["alcohol"] = alcohol_array;
-topic_arrays["smoke"] = smoke_array;
+const topic_arrays = {
+  alcohol: risk_alcohol,
+  smoke: risk_smoke,
+};
+
+const comparison_selection_race = [
+  ["race_00", "All Races (includes Hispanic)"],
+];
 """
 
 
@@ -40,16 +46,16 @@ def test_parse_risk_defines_returns_topic_to_risk_mapping():
     }
 
 
-def test_parse_risk_defines_skips_commented_lines():
+def test_parse_risk_defines_skips_commented_out_blocks():
     result = risk.parse_risk_defines(SAMPLE_RISK_JS)
-    # v501 is commented out and must not appear.
-    assert "v501" not in result.get("alcohol", {})
+    assert "old" not in result
+    assert all("v999" not in ids for ids in result.values())
 
 
-def test_parse_risk_defines_skips_placeholder_choice_entries():
+def test_parse_risk_defines_ignores_non_risk_consts():
+    # topic_arrays lookup table and unrelated consts must not become topics.
     result = risk.parse_risk_defines(SAMPLE_RISK_JS)
-    assert "**" not in result.get("alcohol", {})
-    assert "**" not in result.get("smoke", {})
+    assert set(result) == {"alcohol", "smoke"}
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +241,7 @@ def test_get_risk_options_combines_html_and_js():
     html_response = MagicMock()
     html_response.status_code = 200
     html_response.text = """
-    <html><body>
+    <html><head><script src="/j/riskDefines.js"></script></head><body>
       <select id="topic">
         <option value="alcohol">Alcohol</option>
       </select>
