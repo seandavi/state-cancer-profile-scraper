@@ -44,7 +44,7 @@ known_weaknesses:
 
 terminology:
   preferred:
-    vintage: a distinct set of upstream SCP estimates, identified by content
+    vintage: one edition of the upstream estimates — the complete set of values the SCP site served during some period, bounded by NCI silently replacing them; identified by content, not by date. Define explicitly at first use (jargon from the economics real-time-data literature).
     release: a dated scrape published as a GitHub release; several releases may capture one vintage
     suppression: upstream withholding of a cell (small-count or state-law)
     harmonized view: the derived cross-vintage artifact; never a modification of release bytes

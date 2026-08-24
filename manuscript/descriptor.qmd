@@ -35,6 +35,9 @@ differentiates. Honest vintage count (3, prospective record). -->
   (dated verification: docs/no-bulk-access.md; wording template there).
 - The access problem: one stratum per request; ~18,852 requests per
   national extract (computed below, not typed).
+- Define "vintage" explicitly at first use (plain-language definition in
+  docs/releases.md; cite the Croushore/Stark real-time-data lineage) —
+  never assume the reader knows the term.
 - The overwrite problem: superseded estimates unrecoverable; ~98% of values
   revised per vintage boundary.
 - Prior art: cancerprof (cite accurately: rOpenSci review closed without

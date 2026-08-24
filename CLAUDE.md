@@ -20,8 +20,11 @@ The plan of record is `SPEC.md`. Audit ground truth about the existing releases 
 
 ## Conventions
 
-- A **vintage** is a distinct set of upstream SCP estimates; releases capturing identical
-  content (modulo `_extracted_at`) belong to one vintage. Vintage assignment is derived by
+- A **vintage** is one edition of the upstream estimates — the complete set of values the
+  SCP site served during some period, before NCI silently replaced them. Releases
+  capturing identical content (modulo `_extracted_at`) belong to one vintage. "Vintage"
+  is a term of art (economics real-time-data literature); define it explicitly wherever
+  it appears user-facing — Zenodo descriptions, docs, and the manuscript at first use. Vintage assignment is derived by
   content comparison for historical releases; from PR #39 forward the scraped
   `notes_<endpoint>.txt` files carry the submission-year provenance.
 - Zenodo: concept `10.5281/zenodo.11098814` is the **data** archive (one version per
