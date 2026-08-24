@@ -127,6 +127,10 @@ class ZenodoClient:
         draft_url = resp["links"]["latest_draft"]
         return self._request("GET", draft_url).json()
 
+    def discard_draft(self, draft: dict) -> None:
+        """Delete an unpublished draft (published records are untouchable)."""
+        self._request("DELETE", f"/api/deposit/depositions/{draft['id']}")
+
     def clear_files(self, draft: dict) -> None:
         """Files do not carry over usefully to a new version — remove all."""
         for f in self._request("GET", draft["links"]["files"]).json():
@@ -257,7 +261,17 @@ def run_deposit(client: ZenodoClient, base_record_id: str, dep: VintageDeposit, 
     if dry_run:
         return None
     draft = client.new_version_draft(base_record_id)
-    client.clear_files(draft)
+    try:
+        client.clear_files(draft)
+    except httpx.HTTPStatusError as exc:
+        # An interrupted upload can leave a file record the server can no
+        # longer delete (500s). The draft is disposable — discard it and
+        # start a clean one.
+        logger.warning("clear_files failed (%s); discarding draft %s and retrying fresh",
+                       exc, draft["id"])
+        client.discard_draft(draft)
+        draft = client.new_version_draft(base_record_id)
+        client.clear_files(draft)
     for path in dep.files:
         logger.info("  upload %s (%d bytes)", path.name, path.stat().st_size)
         client.upload_file(draft, path)
