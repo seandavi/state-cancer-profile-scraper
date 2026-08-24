@@ -1,0 +1,133 @@
+{
+ "tag": "2026-08-24",
+ "files": [
+  {
+   "filename": "gh_hash.txt",
+   "sha256": "96e47c2d960876456675f0e06c00e80d5a10c46bad2c7e2b05b1cc86b61989b1",
+   "bytes": 41
+  },
+  {
+   "filename": "notes_demographics.txt",
+   "sha256": "64ac61709d93ce5e35f95ccbca4d009556b7a42d9af2f1e8e9ba140118931af2",
+   "bytes": 1462,
+   "notes": {
+    "created_on": "08/24/2026",
+    "submission_years": []
+   }
+  },
+  {
+   "filename": "notes_incidence.txt",
+   "sha256": "dd30ca5b482210716ef8d3134f86551e561d8b5fc21284800ed958320c134460",
+   "bytes": 4654,
+   "notes": {
+    "created_on": "08/24/2026",
+    "submission_years": [
+     "2024"
+    ]
+   }
+  },
+  {
+   "filename": "notes_mortality.txt",
+   "sha256": "fcd4ce55683e29250ccb49238029f029bcd06f500127f0c8189530a57824132e",
+   "bytes": 3354,
+   "notes": {
+    "created_on": "08/24/2026",
+    "submission_years": []
+   }
+  },
+  {
+   "filename": "notes_risk.txt",
+   "sha256": "90a5b6a24d4a43f93d3a671c62e8409e80aaa636aa52ef8dcf643214eff8de2c",
+   "bytes": 1143,
+   "notes": {
+    "created_on": "08/24/2026",
+    "submission_years": []
+   }
+  },
+  {
+   "filename": "release_note.txt",
+   "sha256": "3c299aec1ee9c0c95717e849016ea237b6263c00e2d4d45a13a61c58045a051d",
+   "bytes": 96
+  },
+  {
+   "filename": "scrape_catalog.jsonl",
+   "sha256": "6e50625ff0ea186e91bc2bee299d97e35ea084f968d5a03ef3bbe0a584f781ba",
+   "bytes": 3427523
+  },
+  {
+   "filename": "select_options.json",
+   "sha256": "51a23a754a2d4f2eb05e78a846d7f7c34c1f1266877867797213a04e69b502e2",
+   "bytes": 3765
+  },
+  {
+   "filename": "state_cancer_profiles_demographics.csv.gz",
+   "sha256": "cb0766fb7d12700e5ea28a7bea9a3f99a9075d530bb4fd831126e81b0ef9e78f",
+   "bytes": 60966925,
+   "format": "csv.gz",
+   "topic": "demographics",
+   "rows": 3281295,
+   "content_sha256": "5b37483e2c2a8328d5f7e31a63898ba04bec1c691a2a4ab9de5591f71aa7d2bc"
+  },
+  {
+   "filename": "state_cancer_profiles_demographics.parquet",
+   "sha256": "f38e187a2479a82ba0013c0609bcf2f92b3fa019312589bc32af2d55bbfd95c6",
+   "bytes": 17508453,
+   "format": "parquet",
+   "rows": 3281295
+  },
+  {
+   "filename": "state_cancer_profiles_incidence.csv.gz",
+   "sha256": "db19dd080289c358946e82a9a8d16dfe7a392330f9c1ec8ff4ce31c45133cacd",
+   "bytes": 212641957,
+   "format": "csv.gz",
+   "topic": "incidence",
+   "rows": 11048853,
+   "content_sha256": "a120cd6e0f73279460dd4d82dc5152b3afd6e3386cd9c4b194fb50ab9efdee34"
+  },
+  {
+   "filename": "state_cancer_profiles_incidence.parquet",
+   "sha256": "66aa8a7b7101343b6df711543d2b10e70ecae3227594d84d4f907b2e56603585",
+   "bytes": 75844731,
+   "format": "parquet",
+   "rows": 11048853
+  },
+  {
+   "filename": "state_cancer_profiles_mortality.csv.gz",
+   "sha256": "56d771100d8ef48b0282336847b905a0dc43e6c8e06641c580578d4bb39aa391",
+   "bytes": 107484131,
+   "format": "csv.gz",
+   "topic": "mortality",
+   "rows": 5866632,
+   "content_sha256": "16f9f39707390bbb5103ec646a127029e8c93a3e1dc8cdaff5f8c0d703f91993"
+  },
+  {
+   "filename": "state_cancer_profiles_mortality.parquet",
+   "sha256": "d144011cb2569e73dcad7511d63f328022acd8c9df1ad98030a60b923cd80e60",
+   "bytes": 38275580,
+   "format": "parquet",
+   "rows": 5866632
+  },
+  {
+   "filename": "state_cancer_profiles_risk.csv.gz",
+   "sha256": "6a38db5fb8b64e198ef0064c023a36643ffbfd0a090a5f694e1013583c1f8ba6",
+   "bytes": 1407034,
+   "format": "csv.gz",
+   "topic": "risk",
+   "rows": 78798,
+   "content_sha256": "6a370ab842e9d52d2191c11ad7e79331cfcdcf511bda29a9570b78d80095574b"
+  },
+  {
+   "filename": "state_cancer_profiles_risk.parquet",
+   "sha256": "794f6b891faf87dd64c7494b783d5445a6bd455cdd55defecc71e5d8b9ffb9da",
+   "bytes": 644522,
+   "format": "parquet",
+   "rows": 78798
+  }
+ ],
+ "content_hashes": {
+  "demographics": "5b37483e2c2a8328d5f7e31a63898ba04bec1c691a2a4ab9de5591f71aa7d2bc",
+  "incidence": "a120cd6e0f73279460dd4d82dc5152b3afd6e3386cd9c4b194fb50ab9efdee34",
+  "mortality": "16f9f39707390bbb5103ec646a127029e8c93a3e1dc8cdaff5f8c0d703f91993",
+  "risk": "6a370ab842e9d52d2191c11ad7e79331cfcdcf511bda29a9570b78d80095574b"
+ }
+}

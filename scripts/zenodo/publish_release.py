@@ -67,6 +67,17 @@ def main() -> int:
                 hashes.append(h)
     else:
         vid, is_new = manifest_mod.assign_vintage(m, vintages)
+
+    # NLM-style deposit documentation; regenerated every release.
+    readme_vintages = dict(vintages)
+    if is_new:
+        readme_vintages = {**vintages, "vintages": {**vintages["vintages"], vid: {
+            "releases": [args.tag], "first_capture": args.tag, "best_capture": args.tag,
+        }}}
+    (args.release_dir / "00_README.txt").write_text(
+        manifest_mod.render_readme(m, vid, readme_vintages)
+    )
+
     if not is_new:
         # Record the tag under its vintage so the mapping stays complete.
         info = vintages["vintages"][vid]
@@ -94,7 +105,7 @@ def main() -> int:
         publication_date=args.tag,
         best_capture=args.tag,
         files=manifest_mod.release_files(args.release_dir)
-        + [args.release_dir / "manifest.json"],
+        + [args.release_dir / "manifest.json", args.release_dir / "00_README.txt"],
     )
 
     if args.sandbox:
@@ -112,7 +123,7 @@ def main() -> int:
             logging.info("Tag already in a deposited version — idempotent no-op.")
             return 0
         latest = versions[-1]["id"] if versions else base_record
-        zenodo.run_deposit(client, str(latest), dep, dry_run=False)
+        zenodo.run_deposit(client, str(latest), dep, dry_run=False, manifest=m)
     else:
         zenodo.run_deposit(zenodo.ZenodoClient(zenodo.SANDBOX, "dry"), "0", dep, dry_run=True)
         # Dry runs record nothing: a vintages.json entry without a deposit

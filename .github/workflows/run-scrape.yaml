@@ -130,7 +130,7 @@ jobs:
           uv run python scripts/zenodo/publish_release.py \
             --release-dir . --tag "${{ steps.date.outputs.date }}" --dry-run
         fi
-        gh release upload "${{ steps.date.outputs.date }}" manifest.json --clobber
+        gh release upload "${{ steps.date.outputs.date }}" manifest.json 00_README.txt --clobber
 
     - name: Record run in ledger
       run: |

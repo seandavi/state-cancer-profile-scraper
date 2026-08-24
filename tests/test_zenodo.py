@@ -93,3 +93,17 @@ def test_run_deposit_dry_run_touches_nothing():
     )
     client = zenodo.ZenodoClient("https://example.invalid", "no-token")
     assert zenodo.run_deposit(client, "0", dep, dry_run=True) is None
+
+
+def test_vintage_metadata_notes_inventory(tmp_path):
+    dep = zenodo.VintageDeposit(
+        vintage_id="V1", tags=["t"], publication_date="2024-08-02",
+        best_capture="t", files=[],
+    )
+    manifest = {"files": [
+        {"filename": "a.csv.gz", "sha256": "ab" * 32, "bytes": 1234, "rows": 10},
+        {"filename": "gh_hash.txt", "sha256": "cd" * 32, "bytes": 41},
+    ]}
+    md = zenodo.vintage_metadata(dep, manifest=manifest)
+    assert "a.csv.gz" in md["notes"] and "ab" * 32 in md["notes"] and "10 rows" in md["notes"]
+    assert "notes" not in zenodo.vintage_metadata(dep)

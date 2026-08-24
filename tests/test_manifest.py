@@ -122,3 +122,20 @@ def test_parquet_row_count_uses_metadata(tmp_path):
     m = manifest.build_manifest(rel, "t")
     pq_entry = next(f for f in m["files"] if f["filename"].endswith(".parquet"))
     assert pq_entry["rows"] == 3
+
+
+def test_render_readme_documents_every_file(tmp_path):
+    rel = _write_release(tmp_path, "2026-01-01T00:00:00")
+    m = manifest.build_manifest(rel, "2026-01-01")
+    vintages = {
+        "concept_doi": "10.5281/zenodo.11098814",
+        "vintages": {"V9": {"releases": ["2026-01-01"], "first_capture": "2026-01-01",
+                            "best_capture": "2026-01-01", "doi": "10.5281/zenodo.999"}},
+    }
+    txt = manifest.render_readme(m, "V9", vintages)
+    for f in m["files"]:
+        assert f["filename"] in txt
+        assert f["sha256"] in txt
+    assert "VINTAGE is one" in txt or "A VINTAGE is one" in txt
+    assert "10.5281/zenodo.999" in txt
+    assert "CC-BY-4.0" in txt
