@@ -136,6 +136,6 @@ def test_render_readme_documents_every_file(tmp_path):
     for f in m["files"]:
         assert f["filename"] in txt
         assert f["sha256"] in txt
-    assert "VINTAGE is one" in txt or "A VINTAGE is one" in txt
+    assert "A **vintage** is one" in txt
     assert "10.5281/zenodo.999" in txt
     assert "CC-BY-4.0" in txt

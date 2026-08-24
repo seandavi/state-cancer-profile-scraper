@@ -152,7 +152,7 @@ _FILE_BLURBS = (
     ("gh_hash.txt", "Git commit of the scraper code that produced this release, in the repository below."),
     ("manifest.json", "Machine-readable inventory: sha256, byte size, row count, and content hash per file, plus provenance fields extracted from the notes."),
     ("release_note.txt", "Short human note attached to the GitHub release."),
-    ("00_README.txt", "This file."),
+    ("00_README", "This file."),
 )
 
 
@@ -164,55 +164,54 @@ def _blurb(filename: str) -> str:
 
 
 def render_readme(manifest: dict, vintage_id: str, vintages: dict) -> str:
-    """NLM-style plain-text documentation of one deposit's files and provenance."""
+    """Deposit documentation as markdown (Zenodo's previewer renders it, and
+    00_README.md sorts first so it appears atop the record page)."""
+    import textwrap
+
     info = vintages["vintages"][vintage_id]
-    tags = ", ".join(info["releases"])
     doi = info.get("doi", "(this version)")
     concept = vintages.get("concept_doi", "10.5281/zenodo.11098814")
     lines = [
-        "00_README.txt",
-        f"United States State Cancer Profiles data extract - vintage {vintage_id}",
-        "=" * 72,
+        f"# United States State Cancer Profiles data extract — vintage {vintage_id}",
         "",
-        "WHAT THIS IS",
+        "## What this is",
         "",
         "A complete national county- and state-level extract of the NCI/CDC State",
         "Cancer Profiles website (statecancerprofiles.cancer.gov), which offers no",
-        "API, bulk download, or archive of prior estimates. A VINTAGE is one",
+        "API, bulk download, or archive of prior estimates. A **vintage** is one",
         "edition of the upstream estimates: the complete set of values the site",
         "served during some period, bounded by NCI silently replacing them with",
         "revised values. Several dated scrapes that captured identical values",
         "belong to one vintage; this deposit preserves one such edition.",
         "",
-        "PROVENANCE",
+        "## Provenance",
         "",
-        f"  Vintage:            {vintage_id} (first captured {info['first_capture']})",
-        f"  Deposited bytes:    GitHub release {info['best_capture']} (the vintage's most complete capture)",
-        f"  All capturing tags: {tags}",
-        f"  Version DOI:        {doi}",
-        f"  Concept DOI:        {concept} (always resolves to the latest vintage)",
-        "  Scraper:            https://github.com/seandavi/state-cancer-profile-scraper",
-        "                      (commit in gh_hash.txt; methods in docs/releases.md)",
-        "  License:            CC-BY-4.0",
+        f"- **Vintage:** {vintage_id} (first captured {info['first_capture']})",
+        f"- **Deposited bytes:** GitHub release `{info['best_capture']}` (the vintage's most complete capture)",
+        f"- **All capturing releases:** {', '.join('`' + t + '`' for t in info['releases'])}",
+        f"- **Version DOI:** {doi}",
+        f"- **Concept DOI:** {concept} (always resolves to the latest vintage)",
+        "- **Scraper:** https://github.com/seandavi/state-cancer-profile-scraper"
+        " (commit in `gh_hash.txt`; methods in `docs/releases.md`)",
+        "- **License:** CC-BY-4.0",
         "",
-        "FILES",
+        "## Files",
         "",
     ]
     for f in manifest["files"]:
-        size = f"{f['bytes']:,} bytes"
-        rows = f" | {f['rows']:,} rows" if "rows" in f else ""
-        lines.append(f"  {f['filename']}  ({size}{rows})")
-        lines.append(f"    sha256: {f['sha256']}")
+        rows = f", {f['rows']:,} rows" if "rows" in f else ""
+        lines.append(f"**{f['filename']}** ({f['bytes']:,} bytes{rows})  ")
+        lines.append(f"`sha256: {f['sha256']}`")
         blurb = _blurb(f["filename"])
         if blurb:
-            import textwrap
-            lines.extend(textwrap.wrap(blurb, width=70, initial_indent="    ", subsequent_indent="    "))
+            lines.append("")
+            lines.extend(textwrap.wrap(blurb, width=78))
         lines.append("")
     lines += [
-        "CITATION",
+        "## Citation",
         "",
-        f"  Davis S. United States State Cancer Profiles data extract - vintage {vintage_id}.",
-        f"  Zenodo. https://doi.org/{doi}" if doi != "(this version)" else "  Zenodo. (DOI of this version)",
+        f"Davis S. *United States State Cancer Profiles data extract — vintage {vintage_id}.*",
+        f"Zenodo. https://doi.org/{doi}" if doi != "(this version)" else "Zenodo. (DOI of this version)",
         "",
     ]
     return "\n".join(lines) + "\n"
