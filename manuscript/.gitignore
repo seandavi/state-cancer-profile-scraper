@@ -4,3 +4,6 @@ descriptor.html
 descriptor.tex
 descriptor.pdf
 descriptor_files/
+/data/geo/
+
+**/*.quarto_ipynb
