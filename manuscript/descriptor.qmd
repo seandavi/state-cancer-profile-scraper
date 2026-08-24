@@ -9,8 +9,11 @@ author:
       - University of Colorado Anschutz Medical Campus
 bibliography: refs.bib
 format:
+  html:
+    fig-dpi: 200
   pdf:
     keep-tex: true
+    fig-format: pdf
 execute:
   freeze: auto
   echo: false
@@ -401,8 +404,8 @@ stratum in which suppression becomes visible.
 #|   counts, or withheld under state law (all Kansas counties). The color
 #|   scale in (a) is truncated at the 2nd and 98th percentiles. Puerto Rico
 #|   is omitted from the maps; boundaries are 2010 Census counties.
-#| fig-width: 7.2
-#| fig-height: 8.4
+#| fig-width: 6.5
+#| fig-height: 6.8
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
@@ -427,7 +430,7 @@ STATUS_COLORS = {"published": "#d9d9d9",
 MISSING = dict(color="#f7f7f7", edgecolor="#cccccc", linewidth=0.05)
 VMIN, VMAX = g["rate"].quantile([0.02, 0.98])
 
-fig = plt.figure(figsize=(7.2, 8.4))
+fig = plt.figure(figsize=(6.5, 6.8))
 panels = {"a": [0.02, 0.52, 0.96, 0.45], "b": [0.02, 0.02, 0.96, 0.45]}
 for key, rect in panels.items():
     px, py, pw, ph = rect
@@ -447,7 +450,7 @@ for key, rect in panels.items():
         if name == "conus":
             ax.set_title(
                 "(a) Age-adjusted incidence rate, all cancer sites" if key == "a"
-                else "(b) Cell status, lung & bronchus", fontsize=11, loc="left")
+                else "(b) Cell status, lung & bronchus", fontsize=10, loc="left")
 
 sm = plt.cm.ScalarMappable(cmap="Blues", norm=plt.Normalize(VMIN, VMAX))
 cax = fig.add_axes([0.60, 0.545, 0.34, 0.012])
@@ -462,8 +465,8 @@ handles = [Patch(facecolor=STATUS_COLORS["published"], label="published"),
                  label="withheld (state law)"),
            Patch(facecolor=MISSING["color"], edgecolor="#cccccc",
                  label="not in stratum / no data")]
-fig.legend(handles=handles, loc="lower right", bbox_to_anchor=(0.98, 0.055),
-           fontsize=8, frameon=False)
+fig.legend(handles=handles, loc="lower right", bbox_to_anchor=(1.0, 0.02),
+           fontsize=7.5, frameon=False)
 plt.show()
 ```
 
@@ -525,7 +528,7 @@ iterates stage for mortality.
 Within each vintage, all clean captures are byte-identical after dropping
 the extraction timestamp — eleven clean V2 releases share one content hash
 per topic — so the release-to-vintage grouping is not sensitive to capture
-date (@fig-vintages a). At the two observed vintage boundaries,
+date. At the two observed vintage boundaries,
 decomposition into new versus common strata shows the signature of upstream
 revision: from V1 to V2, 98.3% of incidence values changed on 902,728
 common strata-rows (98.6% of mortality on 733,172); from V2 to V3, 98.2%
@@ -540,61 +543,37 @@ deposits -->
 ```{python}
 #| label: fig-vintages
 #| fig-cap: >
-#|   Capture history and revision at a vintage boundary. (a) The dated
-#|   releases (points) grouped into vintages by content hash; open points
-#|   are the two defective partial scrapes. (b) County-level age-adjusted
-#|   all-sites incidence rates in vintage V2 (release 2026-02-01) against
-#|   the same counties in vintage V3 (release 2026-08-24); the diagonal is
-#|   identity. Nearly every county's published rate changed at the
-#|   boundary.
-#| fig-width: 9
-#| fig-height: 3.6
-import datetime
+#|   County-level age-adjusted all-sites incidence rates in vintage V2
+#|   (release 2026-02-01) against the same counties in vintage V3 (release
+#|   2026-08-24); the diagonal is identity. Nearly every county's published
+#|   rate changed at the vintage boundary. Axes are truncated at 800 per
+#|   100,000; one county lies beyond both limits (Union County, Florida,
+#|   FIPS 12125: 1,248 in V2, 1,215 in V3).
+#| fig-width: 4.4
+#| fig-height: 4.4
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-
-VCOLOR = {"V1": "#0072B2", "V2": "#E69F00", "V3": "#009E73"}
-fig, (ax, bx) = plt.subplots(
-    1, 2, figsize=(9, 3.6), width_ratios=[1.4, 1],
-    constrained_layout=True)
-
-for i, (vid, info) in enumerate(sorted(vintages.items())):
-    dates = [datetime.date.fromisoformat(r[:10]) for r in info["releases"]]
-    defect = set(info["defective_releases"])
-    good = [d for r, d in zip(info["releases"], dates) if r not in defect]
-    bad = [d for r, d in zip(info["releases"], dates) if r in defect]
-    ax.plot([min(dates), max(dates)], [i, i], color=VCOLOR[vid],
-            lw=1.2, alpha=0.5)
-    ax.plot(good, [i] * len(good), "o", color=VCOLOR[vid], ms=6)
-    if bad:
-        ax.plot(bad, [i] * len(bad), "o", mfc="white", mec=VCOLOR[vid], ms=6)
-    ax.annotate(f"{vid} — {info['doi']}",
-                (min(dates), i + 0.22), fontsize=8.5, color="#333333")
-ax.set_ylim(-0.5, 2.8)
-ax.set_yticks([])
-locator = mdates.MonthLocator(bymonth=(1, 7))
-ax.xaxis.set_major_locator(locator)
-ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
-ax.tick_params(labelsize=8)
-ax.spines[["left", "top", "right"]].set_visible(False)
-ax.set_title("(a) Releases and vintages", fontsize=11, loc="left")
 
 sc = pd.read_csv("data/fig_revision_scatter.csv", dtype={"fips": str})
 pct_changed = (sc.rate_v2 != sc.rate_v3).mean()
+# the caption names the single county beyond the 800 truncation; fail the
+# render if regenerated data ever changes that
+beyond = sc[(sc.rate_v2 > 800) | (sc.rate_v3 > 800)]
+assert list(beyond.fips) == ["12125"], beyond
+fig, bx = plt.subplots(figsize=(4.4, 4.4), constrained_layout=True)
 bx.axline((300, 300), slope=1, color="#999999", lw=1, zorder=1)
-bx.plot(sc.rate_v2, sc.rate_v3, ".", ms=2.5, alpha=0.35,
+bx.plot(sc.rate_v2, sc.rate_v3, ".", ms=3, alpha=0.35,
         color="#0072B2", rasterized=True, zorder=2)
+bx.set_xlim(150, 800)
+bx.set_ylim(150, 800)
 bx.set_xlabel("rate per 100,000, V2 (2026-02-01)", fontsize=9)
 bx.set_ylabel("rate per 100,000, V3 (2026-08-24)", fontsize=9)
 bx.tick_params(labelsize=8)
 bx.set_aspect("equal")
 bx.spines[["top", "right"]].set_visible(False)
-bx.set_title("(b) All-sites county rates across the V2→V3 boundary",
-             fontsize=11, loc="left")
 plt.show()
 ```
 
-The per-county comparison in @fig-vintages (b) is computed from the
+The per-county comparison in @fig-vintages is computed from the
 deposited artifacts: of `{python} fmt(len(sc))` counties with a published
 all-sites rate in both vintages,
 `{python} f"{pct_changed:.1%}"` have different values.
@@ -733,13 +712,6 @@ history is available as GitHub releases at
 posting (SPEC §6). -->
 Research reported in this publication was supported by the National Cancer
 Institute of the National Institutes of Health under Award Number
-P30CA046934. The content is solely the responsibility of the authors and
-does not necessarily represent the official views of the National
-Institutes of Health.
-
-## Acknowledgements {.unnumbered}
-
-This work was supported by the National Cancer Institute under Award Number
 P30CA046934 and by the Rifkin and Bennis Endowed Chair funds (S.D.).
 
 ## Competing interests {.unnumbered}
@@ -760,12 +732,11 @@ required.
 
 AI coding and writing assistants (Anthropic Claude) were used in this
 work: to write and revise pipeline and validation code, to run the audits
-summarized in Technical Validation, and to draft manuscript text. All
+summarized in Technical Validation, and to edit manuscript text. All
 AI-produced code and text were reviewed, edited, and approved by the
 author, who takes full responsibility for the content. A working log of AI
 sessions and the disposition of their output (accepted, modified, or
-rejected) is kept in the project repository. AI tools are not authors and
-do not meet authorship criteria.
+rejected) is kept in the project repository. 
 
 # References {.unnumbered}
 
