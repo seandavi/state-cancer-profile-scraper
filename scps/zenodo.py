@@ -194,6 +194,7 @@ def vintage_metadata(dep: VintageDeposit, repo: str = "seandavi/state-cancer-pro
         f"is not necessarily the first; the publication date reflects first "
         f"capture. Vintage grouping method and release-level provenance: "
         f"https://github.com/{repo}/blob/main/docs/releases.md</p>"
+        + _topics_paragraph(dep)
     )
     return {
         "title": f"United States State Cancer Profiles data extract — vintage {dep.vintage_id}",
@@ -208,6 +209,30 @@ def vintage_metadata(dep: VintageDeposit, repo: str = "seandavi/state-cancer-pro
             for u in tag_urls
         ],
     }
+
+
+def _topics_paragraph(dep: VintageDeposit) -> str:
+    """State which topics the deposit carries and how topic editions relate
+    to vintage identity (which is keyed on incidence+mortality only)."""
+    has_all_topics = any("risk" in f.name for f in dep.files)
+    if not has_all_topics:
+        return (
+            "<p><b>Topics:</b> this vintage predates collection of the "
+            "screening/risk-factor and demographics topics (added to the "
+            "scraper on 2026-05-28); it contains incidence and mortality "
+            "only.</p>"
+        )
+    return (
+        "<p><b>Topics and editions:</b> vintage identity is keyed on the "
+        "registry-observed incidence and mortality estimates. The "
+        "screening/risk-factor and demographics topics are modelled or "
+        "survey products (BRFSS small-area estimates; American Community "
+        "Survey) that refresh on their own cadence; this deposit carries "
+        "the newest edition of those topics captured during the vintage. "
+        "Any earlier within-vintage editions remain available, "
+        "byte-identical and hash-verified, in the GitHub releases listed "
+        "above.</p>"
+    )
 
 
 def deposited_tags(versions: list[dict]) -> set[str]:

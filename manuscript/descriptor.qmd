@@ -139,7 +139,11 @@ for r in rows:
 - Risk/screening estimates are MODELLED small-area estimates
   (raghunathan2007combining, liu2019smallarea), not registry-observed —
   different epistemic status from incidence/mortality; they can change
-  between vintages because the model was refit.
+  between vintages because the model was refit. Vintage identity is keyed
+  on incidence+mortality only; risk/demographics editions refresh on
+  their own cadence, the Zenodo deposit carries the newest edition per
+  vintage, and earlier within-vintage editions live in the GitHub
+  releases (hash-verified).
 - Trend columns are Joinpoint outputs whose software defaults have
   changed over time (kim2022twentyyears): do not compare AAPC across
   vintages without checking the producing version.

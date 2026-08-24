@@ -8,6 +8,12 @@
 > scrapes that captured identical values belong to one vintage. The term follows the
 > "real-time data" literature in economics, where a vintage is a statistical series as it
 > existed on a given date (Croushore & Stark).
+>
+> Vintage identity is keyed on the **registry-observed incidence and mortality** estimates
+> only. The screening/risk-factor and demographics topics are modelled or survey products
+> (BRFSS small-area estimates; ACS) that refresh on their own cadence; a vintage's Zenodo
+> deposit carries the newest topic edition captured during the vintage, and earlier
+> within-vintage editions remain in the GitHub releases, hash-verified via `manifests/`.
 
 Covers SPEC Task 0 items 1, 2 (and item 4/5 live in `schema-drift.md` / `coverage-drift.md`).
 Audit performed 2026-08-23 against `seandavi/state-cancer-profile-scraper`. All 19 releases
