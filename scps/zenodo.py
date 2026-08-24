@@ -23,9 +23,12 @@ logger = logging.getLogger("scps.zenodo")
 PRODUCTION = "https://zenodo.org"
 SANDBOX = "https://sandbox.zenodo.org"
 
-# The data concept (docs/audit.md §3). The webhook-maintained software
+# The data archive is concept DOI 10.5281/zenodo.11098814, but Zenodo's
+# /versions and newversion APIs navigate from a VERSION record id, not the
+# concept id (the concept 404s there) — any version id of the concept works
+# forever, so we pin the 2024 deposit. The webhook-maintained software
 # concept 13174526 must never be written to by this code.
-PRODUCTION_CONCEPT_RECORD = "11098814"
+PRODUCTION_CONCEPT_RECORD = "11102940"
 
 CREATORS = [{"name": "Davis, Sean", "orcid": "0000-0002-8991-6458"}]
 
@@ -49,15 +52,16 @@ class ZenodoClient:
 
     def __init__(self, base_url: str, token: str):
         self.base_url = base_url.rstrip("/")
-        self._params = {"access_token": token}
+        # Bearer header, never a query param: tokens in URLs end up in
+        # logs and tracebacks.
+        self._headers = {"Authorization": f"Bearer {token}"}
 
     def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
         if url.startswith("/"):
             url = self.base_url + url
-        params = {**self._params, **kwargs.pop("params", {})}
         for attempt in range(6):
             resp = httpx.request(
-                method, url, params=params, timeout=120.0, **kwargs
+                method, url, headers=self._headers, timeout=120.0, **kwargs
             )
             if resp.status_code not in _RETRY_STATUSES:
                 resp.raise_for_status()
