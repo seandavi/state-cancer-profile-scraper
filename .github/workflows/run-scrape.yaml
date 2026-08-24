@@ -117,11 +117,13 @@ jobs:
     - name: Manifest and Zenodo publish
       env:
         ZENODO_TOKEN: ${{ secrets.ZENODO_TOKEN }}
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
         GH_TOKEN: ${{ github.token }}
       run: |
         # Same code path as the backfill (SPEC M4). Publishes a new Zenodo
         # version only when the scrape is a new vintage; without a token it
-        # still builds the manifest but records nothing (dry-run).
+        # still builds the manifest but records nothing (dry-run). On a real
+        # publish, also mirrors to Hugging Face (SPEC M6) when HF_TOKEN is set.
         if [ -n "$ZENODO_TOKEN" ]; then
           uv run python scripts/zenodo/publish_release.py \
             --release-dir . --tag "${{ steps.date.outputs.date }}"
