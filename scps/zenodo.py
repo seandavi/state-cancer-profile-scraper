@@ -119,7 +119,10 @@ class ZenodoClient:
             for d in drafts:
                 if d.get("conceptrecid") == concept:
                     logger.info("Reusing existing draft %s", d["id"])
-                    return d
+                    # List items lack links.bucket — fetch the full record.
+                    return self._request(
+                        "GET", f"/api/deposit/depositions/{d['id']}"
+                    ).json()
             raise
         draft_url = resp["links"]["latest_draft"]
         return self._request("GET", draft_url).json()
