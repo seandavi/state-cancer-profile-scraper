@@ -74,7 +74,7 @@ def main() -> int:
         readme_vintages = {**vintages, "vintages": {**vintages["vintages"], vid: {
             "releases": [args.tag], "first_capture": args.tag, "best_capture": args.tag,
         }}}
-    (args.release_dir / "00_README.txt").write_text(
+    (args.release_dir / "00_README.md").write_text(
         manifest_mod.render_readme(m, vid, readme_vintages)
     )
 
@@ -105,7 +105,7 @@ def main() -> int:
         publication_date=args.tag,
         best_capture=args.tag,
         files=manifest_mod.release_files(args.release_dir)
-        + [args.release_dir / "manifest.json", args.release_dir / "00_README.txt"],
+        + [args.release_dir / "manifest.json", args.release_dir / "00_README.md"],
     )
 
     if args.sandbox:
