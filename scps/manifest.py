@@ -107,7 +107,9 @@ def build_manifest(release_dir: Path, tag: str) -> dict:
             entry.update(format="csv.gz", topic=topic, rows=rows, content_sha256=chash)
             content_hashes[topic] = chash
         elif path.suffix == ".parquet":
-            entry.update(format="parquet", rows=len(pd.read_parquet(path, columns=[])))
+            import pyarrow.parquet as pq
+
+            entry.update(format="parquet", rows=pq.ParquetFile(path).metadata.num_rows)
         notes_match = re.fullmatch(r"notes_(\w+)\.txt", path.name)
         if notes_match:
             entry["notes"] = extract_notes_fields(path.read_text())
