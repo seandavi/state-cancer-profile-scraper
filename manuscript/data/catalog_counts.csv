@@ -1,0 +1,5 @@
+endpoint,query_slices,catalog_total,as_of
+demographics,3816,18852,2026-08-24
+incidence,7092,18852,2026-08-24
+mortality,3672,18852,2026-08-24
+risk,600,18852,2026-08-24

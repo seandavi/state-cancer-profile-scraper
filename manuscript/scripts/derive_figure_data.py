@@ -46,6 +46,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--v2-incidence", required=True)
     ap.add_argument("--v3-incidence", required=True)
+    ap.add_argument("--v3-dir", help="directory holding all four V3 topic "
+                    "parquet files; enables data/topic_universe.csv")
+    ap.add_argument("--catalog", help="deposited scrape_catalog.jsonl; "
+                    "enables data/catalog_counts.csv")
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
 
@@ -84,6 +88,35 @@ def main():
     status = lung.suppression_reason.fillna("published")
     pd.DataFrame({"fips": lung.fips, "status": status}).to_csv(
         OUT / "fig_map_suppression.csv", index=False)
+
+    if args.v3_dir:
+        rows = []
+        for topic in ["incidence", "mortality", "demographics", "risk"]:
+            df = pd.read_parquet(
+                f"{args.v3_dir}/state_cancer_profiles_{topic}.parquet")
+            code = df["fips"] if "fips" in df.columns else df["area_code"]
+            county_codes = code[(code.str.len() == 5) & (code != "00000")]
+            rows.append({
+                "topic": topic,
+                "rows": len(df),
+                "county_level_codes": county_codes.nunique(),
+                "state_rows": int((df.locale_type == "state").sum()),
+                "national_rows": int((df.locale_type == "national").sum()),
+                "includes_pr": bool(code.str[:2].eq("72").any()),
+                "tier_column": "areatype" if "areatype" in df.columns
+                               else "statefips_query",
+            })
+        pd.DataFrame(rows).to_csv(OUT / "topic_universe.csv", index=False)
+
+    if args.catalog:
+        import json as _json
+        recs = [_json.loads(l) for l in open(args.catalog)]
+        latest = max(r["last_seen"] for r in recs)
+        cur = pd.DataFrame(r for r in recs if r["last_seen"] == latest)
+        counts = cur.groupby("endpoint").size().rename("query_slices")
+        counts.to_frame().assign(catalog_total=len(recs),
+                                 as_of=latest).to_csv(
+            OUT / "catalog_counts.csv")
 
     for f in sorted(OUT.glob("*.csv")):
         print(f.name, f.stat().st_size, "bytes")

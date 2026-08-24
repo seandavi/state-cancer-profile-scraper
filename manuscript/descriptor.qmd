@@ -42,6 +42,13 @@ total_rows = sum(topic_rows.values())
 csv_mb = sum(f["bytes"] for f in latest["files"] if f.get("format") == "csv.gz") / 1e6
 parquet_mb = sum(f["bytes"] for f in latest["files"] if f.get("format") == "parquet") / 1e6
 
+universe = pd.read_csv("data/topic_universe.csv")
+assert universe.county_level_codes.nunique() == 1
+n_universe = int(universe.county_level_codes.iloc[0])
+
+catalog = pd.read_csv("data/catalog_counts.csv")
+n_requests = int(catalog.query_slices.sum())
+
 def fmt(n):
     return f"{n:,}"
 ```
@@ -51,21 +58,24 @@ def fmt(n):
 State Cancer Profiles (statecancerprofiles.cancer.gov), maintained by the
 National Cancer Institute with the Centers for Disease Control and Prevention,
 is a widely used source of county- and state-level cancer statistics in the
-United States. The site offers no API, no bulk download, and no archive of
+United States, used for cancer-center catchment-area surveillance and for
+geographic studies of cancer burden, screening, and access to care. The
+site offers no API, no bulk download, and no archive of
 prior estimates: its sole machine-readable export returns one statistical
 stratum per HTTP request, and when the underlying data are updated the
 previous estimates are overwritten and become unrecoverable. This resource
 provides the complete national county- and state-level extract of all four
-State Cancer Profiles data topics — incidence, mortality, screening and risk
-factors, and demographics — as typed, analysis-ready files with the
+State Cancer Profiles data topics (incidence, mortality, screening and risk
+factors, and demographics) as typed, analysis-ready files with the
 stratifying dimensions as columns, published under pinned, citable version
 DOIs on Zenodo (concept DOI `{python} concept_doi`). One version DOI is
-minted per distinct upstream data *vintage*; three vintages have been
-captured to date, and at each observed vintage boundary roughly 98% of
-estimate values changed, so vintage identity materially affects downstream
-analysis. From the 2026-08-24 release forward, cells that the upstream site
-suppresses are retained as typed nulls with an explicit suppression-reason
-column. Capture is automated on a monthly cadence, and each future upstream
+minted per distinct upstream data *vintage*, the set of values the site
+served between successive replacements. Three vintages have been captured to date; at each
+observed vintage boundary roughly 98% of estimate values changed, so which
+vintage an analysis draws on affects its results. From the 2026-08-24 release
+forward, cells that the upstream site suppresses are retained as typed nulls
+with an explicit suppression-reason column. Capture has been automated on an
+approximately monthly cadence since February 2025, and each future upstream
 revision will be preserved as a new vintage.
 
 # Background & Summary
@@ -74,36 +84,54 @@ State Cancer Profiles (SCP; <https://statecancerprofiles.cancer.gov>) is a
 joint National Cancer Institute and Centers for Disease Control and
 Prevention website that publishes cancer incidence, mortality, screening and
 risk-factor, and demographic estimates for United States counties, states,
-and the nation. County-level statistics of this kind underpin a substantial
-share of cancer control practice and research. NCI-designated cancer centers
-are required to characterize and serve defined catchment areas, and SCP is a
-primary source for the geographic surveillance tools built for that purpose
-[@burus2023cancerinfocus; @sonawane2024dashboards; @spees2024chana]; one such
-tool has been adopted by 35 institutions, including 26 NCI-designated centers
-[@burus2025cifimpact]. Published studies draw county-level SCP estimates for
-questions of geographic access to oncology care
+and the nation.
+
+## Cancer surveillance, catchment areas, and community outreach
+
+County-level cancer statistics are working inputs to cancer control
+practice as well as to research. NCI-designated cancer centers carry a
+formal surveillance obligation: the NCI Cancer Center Support Grant
+requires each center to define a catchment area, characterize its cancer
+burden and risk-factor profile, and demonstrate Community Outreach and
+Engagement (COE) responsive to that burden
+[@burus2023cancerinfocus; @spees2024chana]. Catchment-area surveillance
+platforms draw on SCP for the county-resolution estimates this work needs
+[@burus2023cancerinfocus; @sonawane2024dashboards;
+@antonio2024deidentification; @munoz2024cancerclarity; @lowery2026ecco];
+one of these, Cancer InFocus, draws directly on SCP and had been licensed
+by 35 institutions, including 26 NCI-designated centers, as of October
+2024 [@burus2025cifimpact].
+
+Beyond catchment surveillance, published studies use county-level SCP
+estimates to examine geographic access to oncology care
 [@shalowitz2015geographic; @zhang2024oncologydensity; @crowley2026oncologists],
 environmental and behavioral exposure correlates of cancer burden
-[@joseph2022pesticides; @wei2025tanning], community-level determinants of
+[@joseph2022pesticides; @wei2025tanning], community factors associated with
 screening and mortality [@drake2025community], and incidence in
-non-metropolitan counties [@jacobson2026pediatric]. All of these uses share a
-dependency: the analysis dataset is whatever the SCP website served on the
-day it was queried.
+non-metropolitan counties [@jacobson2026pediatric]. All of these uses rest
+on data that can be neither obtained in bulk nor recovered once the site
+updates: the analysis dataset is whatever SCP served on the day it was
+queried.
 
-Obtaining these data in bulk is not supported. As of 23 August 2026, the SCP
-website provided no public API and no bulk-download facility. Its
+## Bulk access and the vintage problem
+
+As of 23 August 2026, the SCP website provided no public API and no
+bulk-download facility. Its
 documentation describes per-table CSV export as the available method for
 obtaining data, and the site's sole machine-readable export returns a single
-statistical *stratum* — one cancer site × race/ethnicity × sex × age × stage
-× area-type combination, covering all areas at once — per HTTP request.
+statistical *stratum* (one cancer site × race/ethnicity × sex × age × stage
+× area-type combination, covering all areas at once) per HTTP request.
 Assembling one complete national county- and state-level extract required
-18,852 such requests. <!-- chunk-needed: request count from
-scrape_catalog.jsonl of the deposited release -->
+`{python} fmt(n_requests)` sequential requests (one per published stratum,
+counted from the deposited scrape catalog), a workload that rules out
+casual bulk reuse. The export also encodes withheld cells as asterisks and
+footnote markers inside otherwise numeric columns, which naive parsing
+either fails on or silently discards.
 
-A second limitation is temporal. NCI periodically replaces the estimates — a
+The second limitation is temporal. NCI periodically replaces the estimates (a
 new SEER/NPCR data submission, revised population denominators, a shifted
-five-year window — and the site serves only the current values. We refer to
-one such edition of the estimates as a **vintage**: the complete set of
+five-year window), and the site serves only the current values. We refer to
+each successive set of estimates as a **vintage**: the complete set of
 values the site served during some period, bounded by the upstream
 replacement. The term follows the real-time-data literature in economics,
 where a data vintage is a statistical series as it existed on a given date
@@ -114,14 +142,17 @@ rates for years after first publication, by enough to change the direction of
 fitted trends [@clegg2002reportingdelay; @das2008completeness]. At each
 vintage boundary observed in this archive, approximately 98% of previously
 published estimate values changed (Technical Validation, @fig-vintages).
-No archive of superseded SCP estimates has existed: the Internet Archive's
-Wayback Machine holds 35,642 pre-2023 captures of SCP CSV exports, but these
-collapse to a few hundred distinct strata — under 1.3% coverage of any single
-vintage, too sparse for reconstruction — while documenting eleven distinct
-pre-2023 incidence data windows, each overwritten and unretrievable today. An
-analysis built on SCP therefore cannot be reproduced from source after the
-next upstream refresh, and the estimates that informed a past decision cannot
-be re-examined.
+
+No archive of superseded SCP estimates has existed. The Internet Archive's
+Wayback Machine (CDX index, assessed 23 August 2026) holds 35,642 pre-2023
+captures of SCP CSV exports, but these collapse to a few hundred distinct
+strata (under 1.3% coverage of any single vintage, too sparse for
+reconstruction) while documenting eleven distinct pre-2023 incidence data
+windows, each overwritten and unretrievable today.
+<!-- chunk-needed: promote the wayback vintage timeline to a figure + small
+deposited CSV per docs/wayback-assessment.md §5 --> An analysis built on SCP
+therefore cannot be reproduced from source after the next upstream refresh,
+and the estimates that informed a past decision cannot be re-examined.
 
 Prior software does not close either gap. `cancerprof`
 [@getwilds_cancerprof] wraps SCP's per-query CSV export in R; it was
@@ -130,68 +161,90 @@ acceptance, and the package was never published on CRAN. It issues one live
 request per stratum, does not record which vintage the numbers came from, and
 caches nothing, so repeated runs of the same script can return different
 values without any indication of change. An earlier R client was abandoned in
-2017 [@silentspring_rscp]. A public repository associated with the Cancer
-InFocus project contains an unpublished national SCP sweep feeding a
-dashboard pipeline, with no release, no registry entry, and no DOI
-[@ciodata_ciftools]. The demand for bulk access is nonetheless visible in the
-workarounds: at least three CRAN packages ship hand-frozen, single-window SCP
-slices as example data
+2017 [@silentspring_rscp], and a public repository contains an unpublished
+national SCP sweep feeding a dashboard pipeline, with no release, no registry
+entry, and no DOI [@ciodata_ciftools]. The demand for bulk access is
+nonetheless visible in the workarounds: at least three CRAN packages ship
+hand-frozen, single-window SCP slices as example data
 [@sarkar_latticeextra; @pearson_seermapper; @otto_spgarch], and the one
 SCP-derived deposit we located in a generalist data repository is a
-single-site, single-window analysis slice [@acharjee2020airquality]. To our
-knowledge, no complete SCP extract has previously been published as a
-versioned, citable dataset.
+single-site, single-window analysis slice [@acharjee2020airquality].
+
+A live
+query client and an archive answer different questions: what the site serves
+today, versus what it served when an analysis was run. The resource
+described here therefore complements clients such as `cancerprof` rather
+than competing with them. To our knowledge, no complete SCP extract has previously been
+published as a citable dataset.
+
+## This resource
 
 This resource addresses both gaps (@fig-workflow). A scraper enumerates the
 site's own query vocabulary, issues one request per stratum, and publishes
 the complete national county- and state-level extract of all four data topics
-as typed CSV and Parquet files in which the stratifying dimensions appear as
-decoded label columns. Dated captures are published as GitHub releases on a
-monthly cadence; distinct vintages are identified by content comparison, and
-each receives a Zenodo version DOI under a single concept DOI, following
-FAIR-oriented dataset-versioning practice
-[@klump2021versioning; @gonzalezcebrian2024versioning]. The design follows
+as typed, analysis-ready CSV and Parquet files in which the stratifying
+dimensions appear as decoded label columns. From the 2026-08-24 release
+forward, cells that the site suppresses are retained as typed nulls with an
+explicit suppression-reason column, so withheld observations remain visible
+and countable rather than silently absent. Dated captures are published as
+GitHub releases on an approximately monthly cadence; distinct vintages are
+identified by content comparison, and each receives a Zenodo version DOI
+under a single concept DOI (the persistent identifier that always resolves
+to the newest deposit), following FAIR-oriented dataset-versioning practice
+[@klump2021versioning; @gonzalezcebrian2024versioning]. A superseded
+vintage therefore remains retrievable at its version DOI after the site
+has replaced it. The design follows
 published descriptors of re-extracted public and governmental data
 [@hasell2020testing; @xu2020covidcases; @ocagli2024jecfa; @vanheusden2025foia;
-@karnik2025offsets; @zhang2025adtransparency]. The archive is complementary
-to live query clients such as `cancerprof`: a client retrieves the current
-estimates, whereas the archive preserves each superseded set of estimates
-together with the releases that captured it — something a live client cannot
-do once the source has been overwritten. Three vintages have been captured
-across `{python} n_releases` releases to date. Vintage boundaries are known
-only to within the interval between successive captures, and vintages
-replaced before capture began in 2024 were not archived; the resource is
-accordingly a prospective record.
+@karnik2025offsets; @zhang2025adtransparency]. Three vintages have been
+captured across `{python} n_releases` releases to date. Vintage boundaries
+are known only to within the interval between successive captures, and
+vintages replaced before capture began in 2024 were not archived; the
+resource is accordingly a prospective record.
 
-![Architecture of the archive. Upper row: monthly capture — one request per
+Each of the practice settings above maps to a concrete use of the archive.
+A catchment-area needs assessment built on a pinned version DOI can be
+reproduced exactly at the next assessment cycle, and differences from a
+newer vintage are attributable to upstream revision rather than to a
+change in the catchment itself. Disparities and access studies can join
+incidence, mortality, screening prevalence, and demographics at county
+level in a single query rather than stratum by stratum. And
+because suppression is recorded rather than silently dropped, a center can
+identify which populations in its catchment are absent from the public
+estimates, and methodologists can measure the selection effect of
+restricting county analyses to unsuppressed areas
+[@jacobson2026pediatric; @kasheri2026dermatologist].
+
+![Architecture of the archive. Upper row: monthly capture, one request per
 statistical stratum against the four State Cancer Profiles report endpoints,
 with the query vocabulary discovered from the live site, content-based
 parsing, and suppression decoding into typed nulls with a reason column.
-Lower row: publication — immutable dated GitHub releases with checksum
+Lower row: publication, as immutable dated GitHub releases with checksum
 manifests; releases are grouped into vintages by content hash, and each new
 vintage receives a Zenodo version DOI under the data concept DOI. Left:
-the upstream revision cycle that motivates the archive — estimates are
+the upstream revision cycle that motivates the archive; estimates are
 replaced in place and prior values are unrecoverable from the
 source.](figures/workflow.svg){#fig-workflow}
 
 # Methods
 
 The pipeline converts upstream report pages into typed tables in which every
-cell of the queried stratum space is accounted for: published values, three
-classes of withheld values, and combinations the site does not publish are
-each represented distinctly. From the 2026-08-24 release forward, cells that
-SCP suppresses are retained as rows with typed null rates and an explicit
-`suppression_reason` column distinguishing small-count suppression from
-state-law withholding. Earlier releases (2024-08-02 through 2026-06-01)
-predate this behavior and omit suppressed rows entirely; the scope of every
-claim in this section is stated accordingly.
+cell of the queried stratum space is accounted for: published values,
+withheld values of two documented kinds, and combinations the site does not
+publish are each represented distinctly. From the 2026-08-24 release
+forward, cells that SCP suppresses are retained as rows with typed null
+rates and an explicit `suppression_reason` column distinguishing small-count
+suppression from state-law withholding. We refer to the 2026-08-24 changes
+(suppression retention, notes preservation, and the Parquet format) as the
+scraper *hardening*. Earlier releases (2024-08-02 through 2026-06-01)
+predate this behavior and omit suppressed rows entirely.
 
 ## Source and extraction unit
 
 SCP serves four query-driven report endpoints: incidence
 (`incidencerates/`), mortality (`deathrates/`), screening and risk factors
 (`risk/`), and demographics (`demographics/`). Appending `output=1` to a
-report URL — the same URL the site's own "Export Data" link emits — returns
+report URL (the same URL the site's own "Export Data" link emits) returns
 the report as CSV. One request fixes one stratum and returns all areas for
 it; requesting `stateFIPS=00` with `areatype=county` returns every US county
 plus the national aggregate in a single response, so geography is not an
@@ -199,13 +252,14 @@ iteration axis. The scraper iterates the cartesian product of the
 stratifying dimensions per endpoint: cancer site × age × sex ×
 race/ethnicity × stage × area-type for incidence, the same minus stage for
 mortality (stage is not a mortality dimension upstream; see Technical
-Validation), topic × risk factor × race/ethnicity × sex × state for
-screening and risk factors, and area-type × topic × measure ×
-race/ethnicity × sex × age for demographics.
+Validation), topic × risk factor × race/ethnicity × sex × reporting tier
+for screening and risk factors (the tier, national by state or national by
+county, is encoded in the state-FIPS query parameter), and area-type ×
+topic × measure × race/ethnicity × sex × age for demographics.
 
 ## Query vocabulary and the scrape catalog
 
-The query vocabulary — the valid codes for every dimension — is not
+The query vocabulary (the valid codes for every dimension) is not
 hardcoded. It is discovered at run time from the site's own HTML select
 elements and JavaScript definition files, so upstream additions (a new
 cancer site, a new race/ethnicity category) enter the next scrape without a
@@ -225,12 +279,14 @@ reported, never silently discarded.
 
 Each response is a report, not a clean data file: a title block, the data
 rows, and a footnote block, separated by blank lines. The parser locates the
-data block by content — it scans for the header line carrying the FIPS or
-HSA-code field — rather than by fixed line offsets, and reads column names
-from the header rather than by position. The distinction has practical
-consequences: SCP added a Rural-Urban Continuum Codes column to county
-reports in 2023, which broke position-based parsing in `cancerprof` for
-three of its four topics at county level [@getwilds_cancerprof] but passed
+data block by content, scanning for the header line that carries the FIPS
+or HSA-code field rather than counting fixed line offsets, and reads column
+names from the header rather than by position. SCP added a 2023-vintage
+Rural-Urban Continuum Codes column to county reports (first present in this
+archive at the V1→V2 boundary). The column broke position-based parsing in
+`cancerprof` [@getwilds_cancerprof] for three of its four topics at county
+level, a failure we verified against the live site on 2026-08-23 and that
+the package's issue tracker has recorded since March 2025; it passed
 through this parser without incident. Everything outside the data block is
 preserved verbatim in per-endpoint `notes_<endpoint>.txt` files: the data
 windows, source registries, suppression-rule text, and data-submission year
@@ -243,15 +299,18 @@ area-sex-race category ("data has been suppressed to ensure confidentiality
 and stability of rate estimates"), and state legislation prohibiting release
 of county-level data. Suppression of this kind is standard practice in
 federal health statistics [@klein2002suppression; @parker2017proportions;
-@talih2023ratesstandards], and its downstream analytic cost is well
-documented in the small-area disparities literature
+@talih2023ratesstandards], and NCI's own surveillance program identifies
+county-level suppression as a material limitation of county cancer
+reporting [@tatalovich2022zonedesign]. Adjacent work on census differential
+privacy likewise shows that upstream disclosure-limitation choices propagate
+unevenly into small-area health estimates
 [@santoslozada2020dp; @krieger2021dp; @li2023dpmapping]. In SCP's export the
 two cases appear as an asterisk or a footnote marker inside otherwise
 numeric columns. The scraper decodes them before numeric coercion: the row
 is kept, the rate columns become typed nulls, and `suppression_reason` is
 set to `suppressed_small_count` or `withheld_state_law`. A user can
 therefore distinguish "suppressed for small counts", "legally withheld", and
-"combination never published" — three states that are indistinguishable in
+"combination never published": three states that are indistinguishable in
 an extract that drops non-numeric rows, as this scraper's own releases did
 before 2026-08-24.
 
@@ -268,7 +327,7 @@ decomposing each between-release difference into new query strata versus
 changed values on strata common to both releases: a scope expansion of the
 scraper adds strata but changes no common values, whereas an upstream
 revision changes nearly all of them (Technical Validation). When the
-scraper's own output format changes — as at the 2026-08-24 hardening —
+scraper's own output format changes, as at the 2026-08-24 hardening,
 content hashes no longer compare across the format change, and vintage
 continuity is instead established by a value-level comparison on common
 strata.
@@ -276,25 +335,24 @@ strata.
 ## Harmonized view
 
 Alongside the immutable per-release files, the pipeline derives a
-harmonized cross-vintage view. Harmonization decisions — label crosswalks,
+harmonized cross-vintage view. Harmonization decisions (label crosswalks,
 column renames, the reclassification of county rows mislabelled by an
-upstream quirk — are recorded as data in a checked-in crosswalk file, not
+upstream quirk) are recorded as data in a checked-in crosswalk file, not
 hardcoded, and the transformation enforces strict accounting: harmonized
 rows plus dropped rows must equal original rows, and any imbalance fails the
 build. Published release bytes are never regenerated or edited; corrections
 are new releases.
 
-## Archiving and versioning
+## Archiving and deposit
 
 A scheduled GitHub Actions workflow scrapes monthly, validates against the
 catalog, writes a manifest of SHA-256 checksums, row counts, and byte sizes
 for every artifact, and publishes a dated GitHub release. When the manifest
-identifies a new vintage, the same code path mints a new Zenodo version on
-the data concept DOI. Each Zenodo version deposits the *best* capture of its
+identifies a new vintage, the same code path mints a new version DOI on
+the data concept. Each vintage's deposit carries the *best* capture of the
 vintage (the most complete release, which is not always the first), sets the
 publication date to the *first* capture, and lists every GitHub release tag
-that captured the vintage in its related identifiers, so the deposit
-reflects both the completeness and the true chronology of capture. Code and
+that captured the vintage in its related identifiers. Code and
 data are archived under separate Zenodo concepts; the data concept
 (`{python} concept_doi`) is the citable identity of this resource.
 
@@ -307,18 +365,22 @@ version DOI (@tbl-vintages).
 
 ```{python}
 #| output: asis
-print("| Vintage | DOI | Releases capturing it | First captured | Best capture |")
-print("|---|---|---|---|---|")
+print("| Vintage | DOI | Releases capturing it | First captured | Best capture | Topics deposited |")
+print("|---|---|---|---|---|---|")
 for vid, info in sorted(vintages.items()):
-    print(f"| {vid} | {info.get('doi', 'pending')} | {len(info['releases'])} | {info['first_capture']} | {info['best_capture']} |")
+    topics = sorted(info["content_sha256"])
+    tlabel = "all four" if len(topics) == 4 else ", ".join(topics)
+    print(f"| {vid} | {info.get('doi', 'pending')} | {len(info['releases'])} | {info['first_capture']} | {info['best_capture']} | {tlabel} |")
 print()
 print(": Data vintages, their Zenodo version DOIs, and the GitHub releases "
-      "that captured them. The publication date of each Zenodo version is "
-      "the date of the vintage's first capture; the deposited bytes are its "
+      "that captured them. The publication date of each version DOI is the "
+      "date of the vintage's first capture; the deposited bytes are its "
       "most complete capture. {#tbl-vintages}")
 ```
 
-Each vintage deposit contains one gzipped CSV per data topic; the V3 deposit
+Each vintage deposit contains one gzipped CSV per data topic captured: the
+two registry topics, incidence and mortality, for V1 and V2, and all four
+topics from V3 (@tbl-vintages). The V3 deposit
 (best capture `2026-08-24`, the first from the hardened scraper) adds a
 Parquet file per topic, the per-endpoint notes files, the scrape catalog,
 the query vocabulary (`select_options.json`), a manifest with per-file
@@ -334,7 +396,15 @@ comprises `{python} fmt(total_rows)` rows across the four topics
 `{python} f"{csv_mb:,.0f}"` MB as gzipped CSV or
 `{python} f"{parquet_mb:,.0f}"` MB as Parquet.
 
-All four topic tables share a common shape: one row per (stratum × area).
+All four topic tables share a common shape, one row per (stratum × area),
+and one geographic universe: `{python} fmt(n_universe)` distinct five-digit
+county-level area codes per topic (United States counties, the District of
+Columbia, and Puerto Rico municipios, plus a small number of upstream
+aggregate rows carrying nonstandard codes, preserved as served), together
+with state and national tiers. The incidence, mortality, and demographics
+tables record the query tier in `areatype`; the upstream risk report carries
+no area-type field, so the risk table records its tier in `statefips_query`
+(`00`, national by state; `99`, national by county).
 @tbl-schema lists the columns of the incidence table, the widest of the
 four, as read from the deposited Parquet file. Mortality omits
 `percent_of_cases_with_late_stage` and its `stage` column is constant;
@@ -470,11 +540,50 @@ fig.legend(handles=handles, loc="lower right", bbox_to_anchor=(1.0, 0.02),
 plt.show()
 ```
 
-The complete capture history — every dated release, including the several
-releases that captured each vintage — is public on GitHub
+The complete capture history (every dated release, including the several
+releases that captured each vintage) is public on GitHub
 (<https://github.com/seandavi/state-cancer-profile-scraper/releases>) with
-per-release manifests in the repository. Data are licensed CC-BY-4.0; the
-scraper and pipeline code are MIT-licensed.
+per-release manifests in the repository. The harmonized cross-vintage view
+is a derived artifact, regenerated deterministically from the release files
+by the pipeline (`scps.normalize`); it is not separately deposited. Data are
+licensed CC-BY-4.0; the scraper and pipeline code are MIT-licensed.
+
+The archive satisfies the FAIR principles [@wilkinson2016fair]:
+each vintage is findable and citable through its version DOI under a stable
+concept DOI; all artifacts are accessible over plain HTTPS without
+registration, under CC-BY-4.0; the typed Parquet and CSV files, keyed on
+FIPS codes, are interoperable with Census and TIGER products and with any
+columnar toolchain; and reuse is supported by per-file checksums,
+per-release provenance (source URLs, extraction timestamps, notes files),
+and immutable release bytes. The long-format typed tables are likewise
+suitable for direct ingestion into statistical and machine-learning
+pipelines: the stratifying dimensions are ordinary columns, the
+suppression-reason field gives missingness an explicit semantics rather
+than silent absence, and a pinned version DOI fixes training data exactly.
+
+The archive is additionally mirrored to a public Hugging Face dataset
+repository
+(<https://huggingface.co/datasets/seandavis/state-cancer-profiles>). The
+mirror is byte-identical to the deposits (every mirrored file's SHA-256 is
+verified against the release manifest before commit), each vintage is a
+tagged commit named for the Zenodo version DOI it mirrors (`zenodo-v1`
+through `zenodo-v3`), and the dataset card directs citation to the concept
+DOI; no DOI is minted on Hugging Face, and Zenodo remains the archival
+copy. The mirror exists for direct query access. DuckDB resolves `hf://`
+paths against the repository without authentication, so the current
+vintage can be evaluated in one statement:
+
+```sql
+SELECT count(*)
+FROM 'hf://datasets/seandavis/state-cancer-profiles/state_cancer_profiles_incidence.parquet';
+```
+
+which returns the incidence row count recorded in the release manifest
+(`{python} fmt(topic_rows['incidence'])`; verified live in Technical
+Validation). Because the mirror's hosting serves cross-origin and HTTP
+range requests, the same queries also run in a browser through DuckDB-WASM
+with no installed software; the Zenodo deposits themselves do not serve
+cross-origin requests, so the in-browser path applies to the mirror only.
 
 # Technical Validation
 
@@ -515,9 +624,9 @@ missing 4 rows; both revert identically at the next release, which upstream
 revisions do not do. Both are recorded as defective in the vintage
 assignments and excluded from best-capture selection.
 
-One caveat governs historical mortality counts: in releases before
-`2026-08-24` the scraper iterated a stage dimension that the mortality
-endpoint ignores, so historical mortality tables contain each row twice —
+In releases before `2026-08-24` the scraper iterated a stage dimension
+that the mortality
+endpoint ignores, so historical mortality tables contain each row twice:
 once labelled all-stages and once spuriously labelled late-stage. Row
 counts for those releases must be halved after deduplication, and the
 phantom late-stage labels discarded; the hardened scraper no longer
@@ -526,17 +635,17 @@ iterates stage for mortality.
 ## Vintage assignment
 
 Within each vintage, all clean captures are byte-identical after dropping
-the extraction timestamp — eleven clean V2 releases share one content hash
-per topic — so the release-to-vintage grouping is not sensitive to capture
+the extraction timestamp (eleven clean V2 releases share one content hash
+per topic), so the release-to-vintage grouping is not sensitive to capture
 date. At the two observed vintage boundaries,
 decomposition into new versus common strata shows the signature of upstream
-revision: from V1 to V2, 98.3% of incidence values changed on 902,728
-common strata-rows (98.6% of mortality on 733,172); from V2 to V3, 98.2%
+revision: from V1 to V2, 98.3% of incidence values changed across 902,728
+rows on common strata (98.6% of mortality on 733,172); from V2 to V3, 98.2%
 changed on 981,550 (97.4% of mortality on 753,490). By contrast, the
 within-V3 scraper scope expansion of `2026-05-28` added 122,041 incidence
 rows while changing zero values on 1,299,615 common rows, and the
 `2026-08-24` hardening changed zero values on 1.99 million common incidence
-and mortality cells — confirming both as capture-scope changes, not new
+and mortality rows; both are therefore capture-scope changes, not new
 vintages. <!-- chunk-needed: recompute boundary decomposition from the
 deposits -->
 
@@ -576,7 +685,11 @@ plt.show()
 The per-county comparison in @fig-vintages is computed from the
 deposited artifacts: of `{python} fmt(len(sc))` counties with a published
 all-sites rate in both vintages,
-`{python} f"{pct_changed:.1%}"` have different values.
+`{python} f"{pct_changed:.1%}"` have different values, with a median
+absolute difference of
+`{python} f"{(sc.rate_v3 - sc.rate_v2).abs().median():.1f}"` per 100,000
+(interquartile range
+`{python} f"{(sc.rate_v3 - sc.rate_v2).abs().quantile(0.25):.1f}"`–`{python} f"{(sc.rate_v3 - sc.rate_v2).abs().quantile(0.75):.1f}"`).
 
 Vintage boundaries are bracketed, not dated: V1→V2 is bounded by a
 six-month gap in captures and V2→V3 by a missing monthly release. An
@@ -591,7 +704,7 @@ vital-statistics origin. Incidence coverage depends on state registry
 publication decisions and grows across vintages: 2,694 counties in V1,
 2,933 in V2, 3,029 in V3. Kansas has no county-level incidence in any
 vintage (state-level Kansas incidence appears only from `2026-05-28`),
-while its county-level mortality is complete throughout — visible as the
+while its county-level mortality is complete throughout; the gap is the
 missing block in @fig-maps (a). Indiana county incidence is absent in V1
 and V2 and present, all 92 counties, from V3. Minnesota, Nevada, and
 Virginia county incidence are missing only in V1.
@@ -599,27 +712,43 @@ Virginia county incidence are missing only in V1.
 
 ## Schema stability
 
-Across all three vintages the category vocabularies are identical — 23
+Across all three vintages the category vocabularies are identical (23
 cancer sites, 6 race/ethnicity groups, 3 sex values, 7 age groups, 2 stage
-values — and exactly one column was ever added upstream (the 2023
-Rural-Urban Continuum Codes note column, at the V1→V2 boundary). Schema
-stability is itself a validated property: the drift audit that produced
-this finding compared column lists, inferred types, and full category
-vocabularies across every release.
+values), and exactly one column was ever added upstream (the 2023
+Rural-Urban Continuum Codes note column, at the V1→V2 boundary). The drift
+audit behind this finding compared column lists, inferred types, and full
+category vocabularies across every release.
 
 ## Suppression census
 
 In post-hardening files suppression is countable directly from
-`suppression_reason`. In the stratum mapped in @fig-maps (b) — lung and
-bronchus, all races, both sexes — the site returned 3,143 county cells:
+`suppression_reason`. In the stratum mapped in @fig-maps (b), lung and
+bronchus, all races, both sexes, the site returned 3,143 county cells:
 2,797 published, 241 suppressed for small counts, and 105 (every Kansas
-county) withheld under state law, matching the independent audit of the
-live site. Historical releases dropped withheld rows, which is why
+county) withheld under state law, matching a reconciliation of the same
+stratum pulled live from the site's export URL on 2026-08-23. Historical releases dropped withheld rows, which is why
 post-hardening captures of the same vintage are substantially larger than
 earlier ones: the difference consists of retained suppressed cells and the
 added state-level tier, not changed estimates.
 <!-- chunk-needed: full suppression census by state and reason from the
 V3 deposit -->
+
+## Mirror integrity
+
+```{python}
+#| include: false
+import duckdb
+hf_count = duckdb.sql(
+    "SELECT count(*) FROM 'hf://datasets/seandavis/state-cancer-profiles/"
+    "state_cancer_profiles_incidence.parquet'").fetchone()[0]
+assert hf_count == topic_rows["incidence"], (hf_count, topic_rows)
+```
+
+Every file on the Hugging Face mirror was SHA-256-verified against the
+release manifest before commit. As an end-to-end check, this document
+queries the live mirror at render time: a `count(*)` over the mirrored
+incidence Parquet returns `{python} fmt(hf_count)` rows, equal to the row
+count in the deposited manifest, and rendering fails on any mismatch.
 
 ## Cross-topic joins
 
@@ -639,7 +768,11 @@ estimates are five-year averages, and consecutive vintages share four of
 their five years. Differencing two vintages does not estimate change over
 time; it largely re-observes the same person-years after revision. Users
 who need temporal contrasts should use the year windows documented in the
-notes files, not vintage-over-vintage differences.
+notes files, not vintage-over-vintage differences. Notes files exist only
+from the `2026-08-24` release: the earlier scraper discarded the report
+notes, so for V1 and V2 the five-year window underlying the estimates is
+not recoverable from the deposits; their `year` column records only
+`Latest 5-year average`.
 
 **Treatment of 2020.** SCP displays 2020 incidence but excludes it from
 its trend fits owing to pandemic-era reporting disruption. Downstream
@@ -661,25 +794,25 @@ Validation for the full list of V1 gaps.
 
 **Filter on `areatype`, not `locale_type`, in pre-`2026-05-28` files.** In
 those releases `locale_type` misclassifies tens of thousands of county
-rows — Louisiana parishes, Alaska boroughs, independent cities, and DC —
-as `other`. The harmonized view corrects this; the immutable release
-bytes do not.
+rows (Louisiana parishes, Alaska boroughs, independent cities, and DC)
+as `other`. The risk table has no `areatype` at all; filter its tier on
+`statefips_query` instead. The harmonized view corrects the
+misclassification; the immutable release bytes do not.
 
 **Suppression semantics differ by era.** In releases from `2026-08-24`
 forward, suppressed cells are present as rows with typed nulls and a
 reason code. In all earlier releases, suppressed cells are simply absent,
 and suppression there is recoverable only by differencing against an
-expected cross-product. The archive does not un-suppress anything: it
-makes suppression countable, which matters because published county
-studies routinely restrict their samples to unsuppressed counties without
+expected cross-product. The archive does not un-suppress anything; it
+makes suppression countable. Published small-area studies restrict their
+samples to unsuppressed areas without
 being able to characterize what was withheld
 [@jacobson2026pediatric; @ladas2026melanoma; @kasheri2026dermatologist].
 
 **Screening and risk-factor estimates are modelled.** They are small-area
 model estimates combining BRFSS and NHIS survey data
 [@raghunathan2007combining; @liu2019smallarea; @liu2025psa], not
-registry-observed counts, and carry a different epistemic status from
-incidence and mortality. They can change between captures because the
+registry-observed counts. They can change between captures because the
 model was refit, not because the underlying population changed. For this
 reason vintage identity is keyed on incidence and mortality only; the
 Zenodo deposit for a vintage carries the newest screening/demographics
@@ -704,7 +837,10 @@ deposit is Zenodo concept DOI
 [10.5281/zenodo.11098814](https://doi.org/10.5281/zenodo.11098814), with
 one version DOI per vintage (@tbl-vintages). The complete dated capture
 history is available as GitHub releases at
-<https://github.com/seandavi/state-cancer-profile-scraper/releases>.
+<https://github.com/seandavi/state-cancer-profile-scraper/releases>, and a
+byte-verified mirror for direct `hf://` query access is maintained at
+<https://huggingface.co/datasets/seandavis/state-cancer-profiles>; the
+mirror carries no DOI, and citation should use the Zenodo DOIs.
 
 ## Funding {.unnumbered}
 

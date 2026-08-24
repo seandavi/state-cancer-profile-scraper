@@ -18,8 +18,10 @@ core_claims:
   - >-
     State Cancer Profiles offers no API, no bulk download, and no archive of
     prior estimates; its sole machine-readable export returns one statistical
-    stratum per request (~18,900 requests for a national extract), and it
-    overwrites superseded estimates.
+    stratum per request (~15,200 requests for a national extract, counted
+    from the deposited scrape catalog; the earlier ~18,900 figure included
+    the phantom mortality stage dimension), and it overwrites superseded
+    estimates.
   - >-
     This resource publishes the complete national county- and state-level
     extract of all four SCP data topics as typed, analysis-ready files with
@@ -38,6 +40,8 @@ known_weaknesses:
   - Only three vintages captured to date; the archive is primarily a prospective record.
   - Vintage boundaries are bracketed by release gaps, not dated; intermediate upstream vintages could have gone uncaptured.
   - Historical releases (V1-V3) are CSV-only and dropped suppressed rows; suppression there is recoverable only by cross-product differencing.
+  - V1 and V2 deposits carry only incidence and mortality; demographics and risk exist from 2026-05-28.
+  - The old scraper discarded report notes, so the five-year data window underlying V1 and V2 estimates is not recoverable from those deposits (year column reads only "Latest 5-year average").
   - Kansas county incidence is absent in every vintage; Indiana county incidence exists only from V3.
   - Historical mortality tables are 50% duplicated (phantom stage dimension); rows labelled late-stage there carry all-stages rates. Fixed prospectively; historical counts must be deduplicated.
   - Demographics race categories only partially map to the incidence/mortality vocabulary; unmappable categories remain topic-local.
@@ -46,14 +50,15 @@ terminology:
   preferred:
     vintage: one edition of the upstream estimates — the complete set of values the SCP site served during some period, bounded by NCI silently replacing them; identified by content, not by date. Define explicitly at first use (jargon from the economics real-time-data literature).
     release: a dated scrape published as a GitHub release; several releases may capture one vintage
-    suppression: upstream withholding of a cell (small-count or state-law)
+    capture: the scrape event or its artifact; a release publishes a capture. "Best capture" = most complete release of a vintage.
+    deposit: the Zenodo artifact of a vintage (one per version DOI)
+    edition: a refresh of the modelled/survey topics (risk, demographics) within a vintage; vintage identity is keyed on incidence+mortality only
+    suppression: upstream withholding of a cell; umbrella term. Its kinds are "small-count suppression" and "state-law withholding".
     harmonized view: the derived cross-vintage artifact; never a modification of release bytes
     stratum: one (site x race x sex x age x stage x areatype) query combination
   forbidden:
-    - version (ambiguous; use vintage or release)
+    - version (ambiguous for data editions; use vintage or release. Sanctioned as the Zenodo technical term "version DOI" — always with "DOI" attached — and as "versioned" in the project title only)
     - snapshot (use capture or release)
-  synonyms:
-    capture: release
 
 style:
   tone: descriptive, restrained; data descriptor genre — no analysis, no conclusions

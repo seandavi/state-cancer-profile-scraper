@@ -7,3 +7,4 @@ descriptor_files/
 /data/geo/
 
 **/*.quarto_ipynb
+descriptor.log
