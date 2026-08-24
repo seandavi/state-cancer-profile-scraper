@@ -56,19 +56,28 @@
     "2026-05-01",
     "2026-05-27",
     "2026-05-28",
-    "2026-06-01"
+    "2026-06-01",
+    "2026-08-24"
    ],
    "first_capture": "2026-04-01",
-   "best_capture": "2026-06-01",
+   "best_capture": "2026-08-24",
    "defective_releases": [],
    "content_sha256": {
     "incidence": [
      "5e7f9f50ef76c51e74770061a176667f217757716b66e142cc5fed46e032ef32",
-     "db2b0672dfdfc87e263efd89da269d667a725060f430a8986f63aa341545e5fa"
+     "db2b0672dfdfc87e263efd89da269d667a725060f430a8986f63aa341545e5fa",
+     "a120cd6e0f73279460dd4d82dc5152b3afd6e3386cd9c4b194fb50ab9efdee34"
     ],
     "mortality": [
      "2ecc04fa1975b0d06d66f8c88ad1d1063fb016b7cce4b25ea68120d11f6aa398",
-     "ec50eace83b001b12332da62e7c538039485789a90e30da0ceabe6717f5d4f4c"
+     "ec50eace83b001b12332da62e7c538039485789a90e30da0ceabe6717f5d4f4c",
+     "16f9f39707390bbb5103ec646a127029e8c93a3e1dc8cdaff5f8c0d703f91993"
+    ],
+    "demographics": [
+     "5b37483e2c2a8328d5f7e31a63898ba04bec1c691a2a4ab9de5591f71aa7d2bc"
+    ],
+    "risk": [
+     "6a370ab842e9d52d2191c11ad7e79331cfcdcf511bda29a9570b78d80095574b"
     ]
    }
   }
