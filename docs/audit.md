@@ -112,9 +112,10 @@ is not a mortality dimension — see the duplication defect in `docs/wayback-ass
 
 ## 7. Credentials
 
-No Zenodo API token found in the environment, `~/.config`, or GSM. **Needed from Sean:**
-a production token (`deposit:write` + `deposit:actions`) and a sandbox.zenodo.org token.
-The webhook's existence confirms the Zenodo account link is healthy.
+Resolved 2026-08-24: production token supplied via `.env` (rotate after the backfill —
+an early traceback exposed it before the Bearer-header fix); sandbox rehearsal consciously
+skipped on Sean's direction in favour of a direct production run with draft-based
+recovery. Backfill complete — see `docs/releases.md` §1.5 for the DOIs.
 
 ## 10. Distribution endpoints — tested 2026-08-23
 

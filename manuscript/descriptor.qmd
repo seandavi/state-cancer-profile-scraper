@@ -79,10 +79,10 @@ differentiates. Honest vintage count (3, prospective record). -->
 #| output: asis
 import json, pathlib
 v = json.loads(pathlib.Path("../data/vintages.json").read_text())["vintages"]
-print("| Vintage | Releases | First captured | Best capture |")
-print("|---|---|---|---|")
+print("| Vintage | DOI | Releases | First captured | Best capture |")
+print("|---|---|---|---|---|")
 for vid, info in sorted(v.items()):
-    print(f"| {vid} | {len(info['releases'])} | {info['first_capture']} | {info['best_capture']} |")
+    print(f"| {vid} | {info.get('doi', 'pending')} | {len(info['releases'])} | {info['first_capture']} | {info['best_capture']} |")
 ```
 
 <!-- Per-vintage DOI table once the backfill has run; file inventory from

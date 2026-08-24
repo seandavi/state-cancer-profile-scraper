@@ -15,7 +15,8 @@
     "mortality": [
      "1f40af102eb84043a0eab51b77c1a95c277012864308b95f37f729ac1488496e"
     ]
-   }
+   },
+   "doi": "10.5281/zenodo.12685787"
   },
   "V2": {
    "releases": [
@@ -48,7 +49,8 @@
      "7e766d8f9630c641b56d22761e24f804c7d1f9adb5dc1f5b787c660588ef8931",
      "342cb495c3f13d88617bf4b68ad84d50c9a2a812eba493d03aa59169e55ce274"
     ]
-   }
+   },
+   "doi": "10.5281/zenodo.22085047"
   },
   "V3": {
    "releases": [
@@ -79,8 +81,10 @@
     "risk": [
      "6a370ab842e9d52d2191c11ad7e79331cfcdcf511bda29a9570b78d80095574b"
     ]
-   }
+   },
+   "doi": "10.5281/zenodo.22085273"
   }
  },
- "definition": "A vintage is one edition of the upstream estimates: the complete set of values statecancerprofiles.cancer.gov served during some period, bounded by NCI silently replacing them with revised values. Several releases that captured identical values belong to one vintage."
+ "definition": "A vintage is one edition of the upstream estimates: the complete set of values statecancerprofiles.cancer.gov served during some period, bounded by NCI silently replacing them with revised values. Several releases that captured identical values belong to one vintage.",
+ "concept_doi": "10.5281/zenodo.11098814"
 }

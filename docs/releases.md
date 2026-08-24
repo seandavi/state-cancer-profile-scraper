@@ -128,6 +128,13 @@ plus the content hash, not a parsed upstream date.
 
 ### 1.5 Consequences for M3 (Zenodo backfill)
 
+**Deposited 2026-08-24** on concept DOI 10.5281/zenodo.11098814: V1 →
+10.5281/zenodo.12685787, V2 → 10.5281/zenodo.22085047, V3 → 10.5281/zenodo.22085273
+(best capture `2026-08-24`; 16 files byte-identity verified against `manifests/`). The
+open questions below were resolved as recommended: best-capture bytes, first-capture
+publication dates.
+
+
 - Three version DOIs, not nineteen. Concept DOI + V1/V2/V3.
 - `related_identifiers` per version lists the tags in §1.1 — 1, 13, and 5 tags respectively.
 - `publication_date` per SPEC = first capture: 2024-08-02, 2025-02-10, 2026-04-01.
