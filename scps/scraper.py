@@ -28,6 +28,7 @@ options are not valid for some of the other options.
 
 import csv
 import functools
+import re
 import io
 from collections.abc import Callable, Iterable, Iterator
 
@@ -107,6 +108,47 @@ NA_VALUES = ["N/A", " N/A", "N/A ", " N/A "]
 # Every SCP export names its area-code column one of these; the header line
 # is located by content, not by a fixed offset (#36).
 _KEY_FIELDS = {"FIPS", "HSA_Code"}
+
+
+_DEFINES_SRC_RE = re.compile(r'src="([^"]*[Dd]efines\.js[^"]*)"')
+_CONST_BLOCK_RE = re.compile(r"const\s+(\w+)\s*=\s*\[(.*?)\];", re.S)
+_PAIR_RE = re.compile(r'\[\s*"([^"]+)"\s*,\s*"([^"]*)"\s*\]')
+
+SCP_HOST = "https://statecancerprofiles.cancer.gov"
+
+
+def find_defines_url(html: str, host: str = SCP_HOST) -> str:
+    """Locate the topic-defines script referenced by a page.
+
+    Upstream renamed riskJSDefines.js -> /j/riskDefines.js (and the
+    demographics equivalent) in a 2026-08 front-end refresh; discovering
+    the URL from the page's own script tag survives the next rename.
+    """
+    m = _DEFINES_SRC_RE.search(html)
+    if m is None:
+        raise ValueError("no *Defines.js script tag found in page")
+    src = m.group(1)
+    return src if src.startswith("http") else host + src
+
+
+def parse_defines(js_text: str, prefix: str) -> dict[str, dict[str, str]]:
+    """Parse 2026-08-format defines: ``const <prefix><topic> = [["id","label"], ...]``.
+
+    Unquoted first elements (OPTION_GROUP_START markers) and ``*_arrays``
+    lookup tables are skipped; ``//`` line comments are ignored.
+    """
+    js_text = "\n".join(
+        line for line in js_text.splitlines()
+        if not line.lstrip().startswith("//")
+    )
+    out: dict[str, dict[str, str]] = {}
+    for name, body in _CONST_BLOCK_RE.findall(js_text):
+        if not name.startswith(prefix) or name.endswith("_arrays"):
+            continue
+        entries = {i: label for i, label in _PAIR_RE.findall(body)}
+        if entries:
+            out[name[len(prefix):]] = entries
+    return out
 
 
 def get_with_retry(url: str, attempts: int = 5) -> httpx.Response:

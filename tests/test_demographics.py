@@ -13,80 +13,53 @@ from scps import demographics
 # ---------------------------------------------------------------------------
 
 SAMPLE_CENSUS_JS = """
-var population_ages_array = new Array();
-population_ages_array['00002'] = "Ages under 18";
-population_ages_array['00003'] = "Ages 65 and over";
+// 2026-08 upstream format.
+const demo_topic_crowd = [
+  ["00027", "Households with >1 person per room"],
+];
 
-var population_races_array = new Array();
-population_races_array['00014'] = "Foreign born";
-population_races_array['00022'] = "Black";
+const demo_topic_ed = [
+  ["00004", "Less than 9th grade"],
+];
 
-var pop_array = new Array();
-pop_array['Ages'] = population_ages_array;
-pop_array['Races'] = population_races_array;
+const demo_topic_pop = [
+  [OPTION_GROUP_START, "Ages"],
+  ["00002", "Ages under 18"],
+  [OPTION_GROUP_START, "Races"],
+  ["00058", "Foreign born"],
+];
 
-var ed_array = new Array();
-ed_array['*****']=CHOOSE_BEGINNING + "choose demographic variable" + CHOOSE_END;
-ed_array['00004']="Less than 9th grade";
-//ed_array['00005']="Less than high school";
-ed_array['00006']="At least bachelor's degree";
+const demo_topic_arrays = {
+  crowd: demo_topic_crowd,
+  ed: demo_topic_ed,
+  pop: demo_topic_pop,
+};
 
-var crowd_array = new Array();
-crowd_array['*****']=CHOOSE_BEGINNING + "choose demographic variable" + CHOOSE_END;
-crowd_array['00027']="Households with >1 person per room";
+const age_all = [
+  ["001", "All Ages"],
+];
 """
 
 
 def test_parse_census_defines_returns_topic_to_demo_mapping():
     result = demographics.parse_census_defines(SAMPLE_CENSUS_JS)
-    assert result["ed"] == {
-        "00004": "Less than 9th grade",
-        "00006": "At least bachelor's degree",
-    }
     assert result["crowd"] == {"00027": "Households with >1 person per room"}
+    assert result["ed"] == {"00004": "Less than 9th grade"}
 
 
-def test_parse_census_defines_merges_population_subarrays_into_pop():
-    """pop_array re-exports population_ages_array + population_races_array."""
+def test_parse_census_defines_pop_skips_group_markers():
+    """OPTION_GROUP_START pseudo-entries (unquoted ids) are not demo ids."""
     result = demographics.parse_census_defines(SAMPLE_CENSUS_JS)
     assert result["pop"] == {
         "00002": "Ages under 18",
-        "00003": "Ages 65 and over",
-        "00014": "Foreign born",
-        "00022": "Black",
+        "00058": "Foreign born",
     }
 
 
-def test_parse_census_defines_skips_comments_and_placeholders():
+def test_parse_census_defines_ignores_non_topic_consts():
     result = demographics.parse_census_defines(SAMPLE_CENSUS_JS)
-    # Commented "00005" line excluded.
-    assert "00005" not in result.get("ed", {})
-    # Placeholder "*****" excluded.
-    assert "*****" not in result.get("ed", {})
-
-
-def test_parse_census_defines_skips_block_commented_arrays():
-    """The live JS has `var ur_array = ...` inside /* ... */; must be skipped."""
-    js_with_block_comment = SAMPLE_CENSUS_JS + """
-/*
-var ur_array = new Array();
-ur_array['*****']=CHOOSE_BEGINNING + "choose demographic variable" + CHOOSE_END;
-ur_array['00001']="Continuum Code";
-*/
-"""
-    result = demographics.parse_census_defines(js_with_block_comment)
-    assert "ur" not in result
-
-
-def test_parse_census_defines_excludes_topic_box_array():
-    """`topic_box_array` is the topic-label lookup, not a topic definition."""
-    js_with_topic_box = SAMPLE_CENSUS_JS + """
-var topic_box_array = new Array();
-topic_box_array["crowd"] = "Crowding";
-topic_box_array["ed"] = "Education";
-"""
-    result = demographics.parse_census_defines(js_with_topic_box)
-    assert "topic_box" not in result
+    # The *_arrays lookup table and unrelated consts (age_all) are excluded.
+    assert set(result) == {"crowd", "ed", "pop"}
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +236,7 @@ def test_get_demographics_options_combines_html_and_js():
     html_response = MagicMock()
     html_response.status_code = 200
     html_response.text = """
-    <html><body>
+    <html><head><script src="/j/demographicsDefines.js"></script></head><body>
       <select id="topic"><option value="crowd">Crowding</option></select>
       <select id="areatype"><option value="county">By County</option></select>
       <select id="race"><option value="00">All Races</option></select>

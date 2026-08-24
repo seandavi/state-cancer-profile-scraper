@@ -21,7 +21,9 @@ from bs4 import BeautifulSoup
 
 from scps.scraper import (
     NA_VALUES,
+    find_defines_url,
     get_with_retry,
+    parse_defines,
     column_text_replace,
     decode_suppression,
     fetch_report,
@@ -32,73 +34,18 @@ from scps.scraper import (
 logger = logging.getLogger("scps.demographics")
 
 DEMO_BASE_URL = "https://statecancerprofiles.cancer.gov/demographics/index.php"
-DEMO_DEFINES_URL = (
-    "https://statecancerprofiles.cancer.gov/demographics/censusJSDefines.js"
-)
 
 _PLACEHOLDER_VALUES = {"*", "**", "***", "****", "*****"}
 
-# Matches lines like:  ed_array['00004']="Less than 9th grade";
-#                       population_ages_array['00002'] = "Ages under 18";
-# Backreferenced quotes (\2 and \4) so apostrophes inside double-quoted
-# labels (e.g. "bachelor's degree") aren't treated as terminators.
-_DEMO_LINE_RE = re.compile(
-    r"""^\s*(?P<array>[a-z_]+_array)\[(['"])(?P<id>[^'"]+)\2\]\s*=\s*"""
-    r"""(['"])(?P<label>.*?)\4\s*;""",
-    re.MULTILINE,
-)
-
-
-# Matches /* ... */ block comments (non-greedy, multi-line).
-_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
-
-# Arrays in the JS file that look like topic definitions but aren't —
-# they're the picker-label lookups, not demo-id mappings.
-_NON_TOPIC_ARRAYS = {"topic_box"}
-
 
 def parse_census_defines(js_text: str) -> dict[str, dict[str, str]]:
-    """Parse ``censusJSDefines.js`` into ``{topic: {demo_id: label}}``.
+    """Parse the demographics defines script into ``{topic: {demo_id: label}}``.
 
-    The ``pop`` topic is a special case: its ids live in two sibling arrays
-    (``population_ages_array``, ``population_races_array``) that are
-    re-exported by ``pop_array['Ages']`` / ``pop_array['Races']`` at runtime.
-    We merge both into the ``pop`` mapping here.
+    2026-08 upstream format: ``const demo_topic_<t> = [["id", "label"], ...]``.
+    The old dual population arrays are now a single upstream ``demo_topic_pop``
+    with OPTION_GROUP_START markers, which the parser skips.
     """
-    # Strip block comments first so commented-out array definitions
-    # (e.g. ur_array) don't get parsed as live topics.
-    js_text = _BLOCK_COMMENT_RE.sub("", js_text)
-
-    flat: dict[str, dict[str, str]] = {}
-    for raw_line in js_text.splitlines():
-        if raw_line.lstrip().startswith("//"):
-            continue
-        match = _DEMO_LINE_RE.match(raw_line)
-        if not match:
-            continue
-        array = match.group("array")
-        demo_id = match.group("id")
-        if demo_id in _PLACEHOLDER_VALUES:
-            continue
-        flat.setdefault(array, {})[demo_id] = match.group("label")
-
-    result: dict[str, dict[str, str]] = {}
-    for array_name, mapping in flat.items():
-        if not array_name.endswith("_array"):
-            continue
-        topic = array_name[: -len("_array")]
-        if topic.startswith("population_") or topic in _NON_TOPIC_ARRAYS:
-            # Folded into pop_array below, or not a real topic.
-            continue
-        result[topic] = dict(mapping)
-
-    pop_merged: dict[str, str] = {}
-    pop_merged.update(flat.get("population_ages_array", {}))
-    pop_merged.update(flat.get("population_races_array", {}))
-    if pop_merged:
-        result["pop"] = pop_merged
-
-    return result
+    return parse_defines(js_text, "demo_topic_")
 
 
 def _parse_select_options(html: str) -> dict[str, dict[str, str]]:
@@ -126,7 +73,7 @@ def get_demographics_options() -> dict[str, Any]:
     html = get_with_retry(DEMO_BASE_URL).text
     select_opts = _parse_select_options(html)
 
-    js_text = get_with_retry(DEMO_DEFINES_URL).text
+    js_text = get_with_retry(find_defines_url(html)).text
     demo_by_topic = parse_census_defines(js_text)
 
     return {
