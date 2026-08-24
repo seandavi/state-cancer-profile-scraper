@@ -112,3 +112,13 @@ def test_release_files_ignores_non_release_artifacts(tmp_path):
     assert "gh_hash.txt" in names
     m = manifest.build_manifest(rel, "t")
     assert all(f["filename"] != "README.md" for f in m["files"])
+
+
+def test_parquet_row_count_uses_metadata(tmp_path):
+    """len(read_parquet(columns=[])) returns 0; metadata.num_rows is right."""
+    rel = _write_release(tmp_path, "2026-01-01T00:00:00")
+    df = pd.DataFrame({"fips": ["01001", "01003", "01005"]})
+    df.to_parquet(rel / "state_cancer_profiles_incidence.parquet", index=False)
+    m = manifest.build_manifest(rel, "t")
+    pq_entry = next(f for f in m["files"] if f["filename"].endswith(".parquet"))
+    assert pq_entry["rows"] == 3
