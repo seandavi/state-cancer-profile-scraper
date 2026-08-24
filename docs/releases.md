@@ -155,6 +155,16 @@ publication dates.
   (2026-02-01 → 2026-04-01). An upstream vintage could have come and gone inside either window
   uncaptured. The manuscript must not claim the archive captures every vintage since 2024.
 
+### 1.6 Consequences for M6 (Hugging Face mirror)
+
+**Mirrored 2026-08-24** to `seandavis/state-cancer-profiles` (public dataset repo):
+V1/V2/V3 each committed once and tagged `zenodo-v1`/`zenodo-v2`/`zenodo-v3`, oldest first
+so tag history matches Zenodo version order. Each vintage's bytes were re-downloaded via
+`gh release download` from its best-capture tag and sha256-verified against the manifest
+already committed at `manifests/<tag>.json` before mirroring — zero mismatches. `duckdb`
+resolves `hf://datasets/seandavis/state-cancer-profiles/...` without auth (confirmed
+against the live repo: `state_cancer_profiles_incidence.parquet` → 11,048,853 rows).
+
 ## 2. Format coverage — no release has Parquet
 
 Every one of the 19 releases is CSV-only (`.csv.gz`). There is no first-Parquet release.

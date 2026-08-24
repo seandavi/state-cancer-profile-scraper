@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from scps import hf  # noqa: E402
 from scps import manifest as manifest_mod  # noqa: E402
 from scps import zenodo  # noqa: E402
 
@@ -124,6 +125,20 @@ def main() -> int:
             return 0
         latest = versions[-1]["id"] if versions else base_record
         zenodo.run_deposit(client, str(latest), dep, dry_run=False, manifest=m)
+
+        # Zenodo publishes first, then mirrors (SPEC M6), so the DOI exists
+        # before anything references it. Sandbox rehearsals never touch the
+        # real HF repo; a missing token just skips the mirror (same
+        # graceful-skip as ZENODO_TOKEN above) until the secret is wired up.
+        if not args.sandbox:
+            hf_token = os.environ.get("HF_TOKEN")
+            if hf_token:
+                tag_name = hf.mirror_vintage(
+                    args.release_dir, dep.files, vid, vintages, m, token=hf_token
+                )
+                logging.info("Mirrored %s to Hugging Face -> tag %s", vid, tag_name)
+            else:
+                logging.info("HF_TOKEN not configured — skipping Hugging Face mirror.")
     else:
         zenodo.run_deposit(zenodo.ZenodoClient(zenodo.SANDBOX, "dry"), "0", dep, dry_run=True)
         # Dry runs record nothing: a vintages.json entry without a deposit
