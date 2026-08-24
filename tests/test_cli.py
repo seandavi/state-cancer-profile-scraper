@@ -329,3 +329,19 @@ def test_mortality_catalog_migration_drops_stage_and_merges(tmp_path):
     # Incidence untouched — stage is a real dimension there.
     inc = [e for e in cat.entries if e.endpoint == "incidence"]
     assert inc[0].combo["stage"] == "211"
+
+
+def test_parquet_safe_handles_mixed_object_columns(tmp_path):
+    """Regression for the first hardened release failing at to_parquet:
+    ci_rank-style columns mix all-NA float slices with str slices (#47)."""
+    import numpy as np
+    from scps.cli import _parquet_safe
+
+    all_na = pd.DataFrame({"fips": ["01001"], "ci_rank": [np.nan], "note": [np.nan]})
+    strs = pd.DataFrame({"fips": ["01003"], "ci_rank": ["1"], "note": ["falling"]})
+    df = pd.concat([all_na, strs], ignore_index=True)
+    out = tmp_path / "x.parquet"
+    _parquet_safe(df).to_parquet(out, index=False)
+    back = pd.read_parquet(out)
+    assert back["ci_rank"].tolist()[1] == "1"
+    assert pd.isna(back["note"].tolist()[0])
