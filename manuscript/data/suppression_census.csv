@@ -1,0 +1,102 @@
+state,reason,cells
+(no state: national tier),published,127760
+(no state: national tier),suppressed_small_count,62542
+Alabama,published,29532
+Alabama,suppressed_small_count,208050
+Alaska,published,4228
+Alaska,suppressed_small_count,98606
+Arizona,published,13007
+Arizona,suppressed_small_count,40183
+Arkansas,published,23280
+Arkansas,suppressed_small_count,242670
+California,published,66339
+California,suppressed_small_count,139329
+Colorado,published,21089
+Colorado,suppressed_small_count,205855
+Connecticut,published,10240
+Connecticut,suppressed_small_count,18128
+Delaware,published,3742
+Delaware,suppressed_small_count,6896
+Florida,published,61186
+Florida,suppressed_small_count,176396
+Georgia,published,61901
+Georgia,suppressed_small_count,501913
+Hawaii,published,4582
+Hawaii,suppressed_small_count,13148
+Idaho,published,11107
+Idaho,suppressed_small_count,144917
+Illinois,published,45654
+Illinois,suppressed_small_count,255756
+Indiana,published,41268
+Indiana,suppressed_small_count,284964
+Iowa,published,26847
+Iowa,suppressed_small_count,324207
+Kansas,withheld_state_law,202230
+Kentucky,published,36479
+Kentucky,suppressed_small_count,389041
+Louisiana,published,30447
+Louisiana,suppressed_small_count,196497
+Maine,published,9457
+Maine,suppressed_small_count,47279
+Maryland,published,21773
+Maryland,suppressed_small_count,63331
+Massachusetts,published,16306
+Massachusetts,suppressed_small_count,33338
+Michigan,published,43152
+Michigan,suppressed_small_count,251166
+Minnesota,published,31951
+Minnesota,suppressed_small_count,276551
+Mississippi,published,25274
+Mississippi,suppressed_small_count,265498
+Missouri,published,36876
+Missouri,suppressed_small_count,370914
+Montana,published,9021
+Montana,suppressed_small_count,189555
+Nebraska,published,11964
+Nebraska,suppressed_small_count,317814
+Nevada,published,7017
+Nevada,suppressed_small_count,53265
+New Hampshire,published,7061
+New Hampshire,suppressed_small_count,28399
+New Jersey,published,29736
+New Jersey,suppressed_small_count,32319
+New Mexico,published,11405
+New Mexico,suppressed_small_count,105613
+New York,published,56742
+New York,suppressed_small_count,126468
+North Carolina,published,59597
+North Carolina,suppressed_small_count,295003
+North Dakota,published,5895
+North Dakota,suppressed_small_count,182043
+Ohio,published,55422
+Ohio,suppressed_small_count,256626
+Oklahoma,published,24511
+Oklahoma,suppressed_small_count,248531
+Oregon,published,18551
+Oregon,suppressed_small_count,109105
+Pennsylvania,published,50679
+Pennsylvania,suppressed_small_count,186903
+Rhode Island,published,4481
+Rhode Island,suppressed_small_count,13249
+South Carolina,published,27880
+South Carolina,suppressed_small_count,135236
+South Dakota,published,7310
+South Dakota,suppressed_small_count,226726
+Tennessee,published,40425
+Tennessee,suppressed_small_count,296445
+Texas,published,95025
+Texas,suppressed_small_count,805659
+Utah,published,9936
+Utah,suppressed_small_count,92898
+Vermont,published,5710
+Vermont,suppressed_small_count,43934
+Virginia,published,51726
+Virginia,suppressed_small_count,419892
+Washington,published,24983
+Washington,suppressed_small_count,113311
+West Virginia,published,18060
+West Virginia,suppressed_small_count,176970
+Wisconsin,published,35604
+Wisconsin,suppressed_small_count,219708
+Wyoming,published,4635
+Wyoming,suppressed_small_count,76923

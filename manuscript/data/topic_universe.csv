@@ -1,0 +1,5 @@
+topic,rows,county_level_codes,state_rows,national_rows,includes_pr,tier_column
+incidence,11048853,3193,179073,7092,True,areatype
+mortality,5866632,3193,93942,3672,True,areatype
+demographics,3281295,3193,93345,3810,True,areatype
+risk,78798,3193,14198,290,True,statefips_query
