@@ -50,6 +50,9 @@ def main():
                     "parquet files; enables data/topic_universe.csv")
     ap.add_argument("--catalog", help="deposited scrape_catalog.jsonl; "
                     "enables data/catalog_counts.csv")
+    ap.add_argument("--v1-dir", help="V1 best-capture release files; with "
+                    "--v2-dir and --v3-dir enables the validation CSVs")
+    ap.add_argument("--v2-dir")
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
 
@@ -118,8 +121,119 @@ def main():
                                  as_of=latest).to_csv(
             OUT / "catalog_counts.csv")
 
+    if args.v1_dir and args.v2_dir and args.v3_dir:
+        validation(args)
+
     for f in sorted(OUT.glob("*.csv")):
         print(f.name, f.stat().st_size, "bytes")
+
+
+KEY = ["cancer", "race", "sex", "age", "stage", "areatype", "fips"]
+RATE = "age_adjusted_rate_per_100_000"
+
+
+def _read(path, columns=None):
+    if str(path).endswith(".parquet"):
+        import pyarrow.parquet as _pq
+        have = set(_pq.ParquetFile(path).schema_arrow.names)
+        df = pd.read_parquet(path, columns=[c for c in columns if c in have])
+    else:
+        df = pd.read_csv(path, dtype={"fips": str},
+                         usecols=lambda c: c in set(columns))
+    df["fips"] = df["fips"].astype(str)
+    return df
+
+
+def _decompose(a, b, key):
+    m = a.merge(b, on=key, suffixes=("_a", "_b"))
+    changed = (m[f"{RATE}_a"] != m[f"{RATE}_b"]).sum()
+    return len(m), int(changed)
+
+
+def validation(args):
+    import json as _json
+    topic = "state_cancer_profiles_{}.{}".format
+    rows = []
+    cols = KEY + [RATE]
+
+    v1i = _read(f"{args.v1_dir}/{topic('incidence', 'csv.gz')}", cols)
+    v2i = _read(f"{args.v2_dir}/{topic('incidence', 'csv.gz')}", cols)
+    v3i = _read(f"{args.v3_dir}/{topic('incidence', 'parquet')}",
+                cols + ["state", "suppression_reason"])
+    v1m = _read(f"{args.v1_dir}/{topic('mortality', 'csv.gz')}", cols)
+    v2m = _read(f"{args.v2_dir}/{topic('mortality', 'csv.gz')}", cols)
+    v3m = _read(f"{args.v3_dir}/{topic('mortality', 'parquet')}", cols)
+
+    # audit method: raw rows, stage included (historical mortality carries
+    # the phantom stage duplication on both sides of V1->V2)
+    for name, a, b in [("V1->V2 incidence", v1i, v2i),
+                       ("V1->V2 mortality", v1m, v2m)]:
+        n, ch = _decompose(a, b, KEY)
+        rows.append({"transition": name, "common_rows": n, "changed": ch})
+    # V2->V3: V3 is post-hardening, so compare published values only and
+    # collapse the phantom stage for mortality (V3 iterates none)
+    v3i_pub = v3i[v3i[RATE].notna()]
+    n, ch = _decompose(v2i, v3i_pub, KEY)
+    rows.append({"transition": "V2->V3 incidence (published-in-both)",
+                 "common_rows": n, "changed": ch})
+    key_ns = [k for k in KEY if k != "stage"]
+    v2m_all = v2m[v2m.stage == "All Stages"]
+    n, ch = _decompose(v2m_all, v3m[v3m[RATE].notna()], key_ns)
+    rows.append({"transition": "V2->V3 mortality (deduped, published)",
+                 "common_rows": n, "changed": ch})
+    bd = pd.DataFrame(rows)
+    bd["pct_changed"] = (bd.changed / bd.common_rows).round(4)
+    bd.to_csv(OUT / "boundary_decomposition.csv", index=False)
+
+    # suppression census (V3 incidence, per state x reason)
+    cen = (v3i.assign(reason=v3i.suppression_reason.fillna("published"),
+                      state=v3i.state.fillna("(no state: national tier)"))
+           .groupby(["state", "reason"]).size().rename("cells").reset_index())
+    cen.to_csv(OUT / "suppression_census.csv", index=False)
+
+    # county coverage (published county rows) per vintage and topic
+    cov = []
+    for vid, inc, mort in [("V1", v1i, v1m), ("V2", v2i, v2m),
+                           ("V3", v3i_pub, v3m[v3m[RATE].notna()])]:
+        for tname, df in [("incidence", inc), ("mortality", mort)]:
+            c = df[(df.areatype == "By County") & df[RATE].notna()
+                   & (df.fips.str.len() == 5) & (df.fips != "00000")]
+            cov.append({"vintage": vid, "topic": tname,
+                        "counties": c.fips.nunique(),
+                        "kansas": c[c.fips.str[:2] == "20"].fips.nunique(),
+                        "indiana": c[c.fips.str[:2] == "18"].fips.nunique()})
+    pd.DataFrame(cov).to_csv(OUT / "coverage_by_vintage.csv", index=False)
+
+    # cross-topic join check (V3): all-sites county strata + race crosswalk
+    def stratum_fips(df, cancer):
+        s = df[(df.cancer == cancer) & (df.sex == "Both Sexes")
+               & (df.race == "All Races (includes Hispanic)")
+               & (df.age == "All Ages") & (df.areatype == "By County")
+               & df[RATE].notna()
+               & (df.fips.str.len() == 5) & (df.fips != "00000")]
+        if "stage" in s.columns and (s.stage == "All Stages").any():
+            s = s[s.stage == "All Stages"]
+        return set(s.fips)
+
+    inc_f = stratum_fips(v3i, "All Cancer Sites")
+    mort_f = stratum_fips(v3m, "All Cancer Sites")
+    xw = _json.loads(
+        (pathlib.Path(__file__).resolve().parents[2] / "data" /
+         "crosswalks.json").read_text())
+    demo = pd.read_parquet(f"{args.v3_dir}/{topic('demographics', 'parquet')}",
+                           columns=["race"])
+    labels = {str(x).replace("\\u00A0", " ").replace("\xa0", " ").strip()
+              for x in demo.race.dropna().unique()}
+    labels = {xw["race_label_fixes"].get(x, x) for x in labels}
+    mapped = {x for x in labels if x in xw["race_canonical"]}
+    pd.DataFrame([{
+        "inc_counties": len(inc_f), "mort_counties": len(mort_f),
+        "joined_counties": len(inc_f & mort_f),
+        "mort_only": len(mort_f - inc_f),
+        "demo_race_labels": len(labels),
+        "demo_race_mapped": len(mapped),
+        "unmapped_labels": "; ".join(sorted(labels - mapped)),
+    }]).to_csv(OUT / "join_check.csv", index=False)
 
 
 if __name__ == "__main__":

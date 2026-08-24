@@ -1,0 +1,5 @@
+transition,common_rows,changed,pct_changed
+V1->V2 incidence,902787,878883,0.9735
+V1->V2 mortality,733172,714176,0.9741
+V2->V3 incidence (published-in-both),981550,954920,0.9729
+"V2->V3 mortality (deduped, published)",376745,362134,0.9612

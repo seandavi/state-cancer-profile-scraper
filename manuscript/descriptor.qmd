@@ -49,6 +49,16 @@ n_universe = int(universe.county_level_codes.iloc[0])
 catalog = pd.read_csv("data/catalog_counts.csv")
 n_requests = int(catalog.query_slices.sum())
 
+bd = pd.read_csv("data/boundary_decomposition.csv").set_index("transition")
+cov = pd.read_csv("data/coverage_by_vintage.csv").set_index(["vintage", "topic"])
+jc = pd.read_csv("data/join_check.csv").iloc[0]
+cen = pd.read_csv("data/suppression_census.csv")
+cen_tot = cen.groupby("reason").cells.sum()
+withheld_states = sorted(cen[cen.reason == "withheld_state_law"].state.unique())
+wb = pd.read_csv("data/wayback_windows.csv")
+pct_revised = bd.pct_changed.mean()
+assert int(cen.cells.sum()) == topic_rows["incidence"]
+
 def fmt(n):
     return f"{n:,}"
 ```
@@ -71,8 +81,9 @@ stratifying dimensions as columns, published under pinned, citable version
 DOIs on Zenodo (concept DOI `{python} concept_doi`). One version DOI is
 minted per distinct upstream data *vintage*, the set of values the site
 served between successive replacements. Three vintages have been captured to date; at each
-observed vintage boundary roughly 98% of estimate values changed, so which
-vintage an analysis draws on affects its results. From the 2026-08-24 release
+observed vintage boundary roughly
+`{python} f"{pct_revised:.0%}"` of estimate values changed, so
+which vintage an analysis draws on affects its results. From the 2026-08-24 release
 forward, cells that the upstream site suppresses are retained as typed nulls
 with an explicit suppression-reason column. Capture has been automated on an
 approximately monthly cadence since February 2025, and each future upstream
@@ -123,10 +134,26 @@ statistical *stratum* (one cancer site × race/ethnicity × sex × age × stage
 × area-type combination, covering all areas at once) per HTTP request.
 Assembling one complete national county- and state-level extract required
 `{python} fmt(n_requests)` sequential requests (one per published stratum,
-counted from the deposited scrape catalog), a workload that rules out
-casual bulk reuse. The export also encodes withheld cells as asterisks and
+counted from the deposited scrape catalog after excluding its
+`{python} fmt(int(catalog.catalog_total.iloc[0]) - n_requests)` phantom
+mortality-stage records; see Technical Validation), a workload that rules
+out casual bulk reuse. The export also encodes withheld cells as asterisks and
 footnote markers inside otherwise numeric columns, which naive parsing
 either fails on or silently discards.
+
+County-resolution alternatives do not substitute for this extract. SEER
+research files require an authenticated data-use agreement and dedicated
+software (seer.cancer.gov/data/access, accessed 24 August 2026), and the
+US Cancer Statistics public-use database excludes county-level records
+under its state data-sharing agreements, reserving them for a
+restricted-access research data center
+(cdc.gov/united-states-cancer-statistics, accessed 24 August 2026). To our
+knowledge, SCP is the only public source of national county-resolution
+cancer incidence estimates; county cancer mortality is separately
+queryable through CDC WONDER, but SCP's derived products (five-year county
+averages, Joinpoint trend estimates, and modelled screening prevalence)
+are published nowhere else, and the studies cited above consumed SCP's
+numbers as served.
 
 The second limitation is temporal. NCI periodically replaces the estimates (a
 new SEER/NPCR data submission, revised population denominators, a shifted
@@ -140,17 +167,17 @@ and where the choice of vintage is known to change analytic conclusions
 the same phenomenon: reporting delay and reporting error revise incidence
 rates for years after first publication, by enough to change the direction of
 fitted trends [@clegg2002reportingdelay; @das2008completeness]. At each
-vintage boundary observed in this archive, approximately 98% of previously
-published estimate values changed (Technical Validation, @fig-vintages).
+vintage boundary observed in this archive, approximately
+`{python} f"{pct_revised:.0%}"` of previously published estimate
+values changed (Technical Validation).
 
 No archive of superseded SCP estimates has existed. The Internet Archive's
-Wayback Machine (CDX index, assessed 23 August 2026) holds 35,642 pre-2023
+Wayback Machine (CDX index, accessed 23 August 2026) holds 35,642 pre-2023
 captures of SCP CSV exports, but these collapse to a few hundred distinct
 strata (under 1.3% coverage of any single vintage, too sparse for
-reconstruction) while documenting eleven distinct pre-2023 incidence data
-windows, each overwritten and unretrievable today.
-<!-- chunk-needed: promote the wayback vintage timeline to a figure + small
-deposited CSV per docs/wayback-assessment.md §5 --> An analysis built on SCP
+reconstruction) while documenting `{python} len(wb)` distinct pre-2023
+incidence data windows, each overwritten and unretrievable today
+(`data/wayback_windows.csv`). An analysis built on SCP
 therefore cannot be reproduced from source after the next upstream refresh,
 and the estimates that informed a past decision cannot be re-examined.
 
@@ -200,7 +227,12 @@ published descriptors of re-extracted public and governmental data
 captured across `{python} n_releases` releases to date. Vintage boundaries
 are known only to within the interval between successive captures, and
 vintages replaced before capture began in 2024 were not archived; the
-resource is accordingly a prospective record.
+resource is accordingly a prospective record. The deposited vintages are
+citable and complete independent of continued operation: if capture were
+to stop, the archive would remain a bounded historical record rather than
+degrade. Continued capture requires no manual step; the scheduled
+integration pipeline publishes releases and mints vintage DOIs through the
+same code path that produced the existing deposits.
 
 Each of the practice settings above maps to a concrete use of the archive.
 A catchment-area needs assessment built on a pinned version DOI can be
@@ -271,7 +303,9 @@ iterate only the catalog; a full cartesian re-discovery runs quarterly and
 whenever manually invoked. The catalog doubles as a regression oracle: a
 combination that returned data at the previous release and returns nothing
 now is treated as a scrape failure, not as newly dead space, and fails the
-run. Requests are issued through a bounded thread pool with exponential
+run. Each release also records the site's then-current query vocabulary
+(`select_options.json`) beside the catalog, and a probe warns when
+upstream adds an identifier the catalog does not know. Requests are issued through a bounded thread pool with exponential
 backoff on transport errors and server errors; failures are counted and
 reported, never silently discarded.
 
@@ -308,7 +342,9 @@ unevenly into small-area health estimates
 two cases appear as an asterisk or a footnote marker inside otherwise
 numeric columns. The scraper decodes them before numeric coercion: the row
 is kept, the rate columns become typed nulls, and `suppression_reason` is
-set to `suppressed_small_count` or `withheld_state_law`. A user can
+set to `suppressed_small_count` or `withheld_state_law`. A marker outside
+these two would surface as a null rate with no reason code; Technical
+Validation shows the deposited file contains none. A user can
 therefore distinguish "suppressed for small counts", "legally withheld", and
 "combination never published": three states that are indistinguishable in
 an extract that drops non-numeric rows, as this scraper's own releases did
@@ -471,9 +507,11 @@ stratum in which suppression becomes visible.
 #|   both sexes. Kansas publishes no county-level incidence in any vintage
 #|   and appears as missing. (b) Cell status for one finer stratum (lung and
 #|   bronchus, all races, both sexes): published rate, suppressed for small
-#|   counts, or withheld under state law (all Kansas counties). The color
-#|   scale in (a) is truncated at the 2nd and 98th percentiles. Puerto Rico
-#|   is omitted from the maps; boundaries are 2010 Census counties.
+#|   counts, or withheld under state law (all Kansas counties); counties
+#|   absent from the stratum are shown as no data. The color scale in (a)
+#|   is truncated at the 2nd and 98th percentiles. Puerto Rico is omitted
+#|   from the maps; boundaries are 2010 Census counties, matching the
+#|   legacy county codes the site serves.
 #| fig-width: 6.5
 #| fig-height: 6.8
 import geopandas as gpd
@@ -546,7 +584,18 @@ releases that captured each vintage) is public on GitHub
 per-release manifests in the repository. The harmonized cross-vintage view
 is a derived artifact, regenerated deterministically from the release files
 by the pipeline (`scps.normalize`); it is not separately deposited. Data are
-licensed CC-BY-4.0; the scraper and pipeline code are MIT-licensed.
+licensed CC-BY-4.0; the scraper and pipeline code are MIT-licensed. SCP's
+published data-use terms restrict use to statistical reporting and
+analysis and prohibit attempts to identify any person or establishment
+(statecancerprofiles.cancer.gov/dataUseRestrictions.html, accessed 24
+August 2026); the archive redistributes only the aggregate,
+already-suppressed statistics the site publishes, and those terms apply
+unchanged to its contents. As publications of United States federal
+agencies, the underlying estimates are not subject to domestic copyright,
+so their redistribution requires no license from the producing agencies;
+the carried-forward terms constrain use, not redistribution. The CC-BY-4.0
+license covers the archive's compilation, documentation, and derived
+artifacts.
 
 The archive satisfies the FAIR principles [@wilkinson2016fair]:
 each vintage is findable and citable through its version DOI under a stable
@@ -639,15 +688,28 @@ the extraction timestamp (eleven clean V2 releases share one content hash
 per topic), so the release-to-vintage grouping is not sensitive to capture
 date. At the two observed vintage boundaries,
 decomposition into new versus common strata shows the signature of upstream
-revision: from V1 to V2, 98.3% of incidence values changed across 902,728
-rows on common strata (98.6% of mortality on 733,172); from V2 to V3, 98.2%
-changed on 981,550 (97.4% of mortality on 753,490). By contrast, the
+revision (comparing age-adjusted rate values on strata common to both
+releases, computed from the deposited files by the derivation script): from
+V1 to V2,
+`{python} f"{bd.loc['V1->V2 incidence','pct_changed']:.1%}"` of incidence
+values changed across
+`{python} fmt(bd.loc['V1->V2 incidence','common_rows'])` common rows
+(`{python} f"{bd.loc['V1->V2 mortality','pct_changed']:.1%}"` of mortality
+on `{python} fmt(bd.loc['V1->V2 mortality','common_rows'])`); from V2 to
+V3, `{python} f"{bd.loc['V2->V3 incidence (published-in-both)','pct_changed']:.1%}"`
+changed on
+`{python} fmt(bd.loc['V2->V3 incidence (published-in-both)','common_rows'])`
+published-in-both rows
+(`{python} f"{bd.loc['V2->V3 mortality (deduped, published)','pct_changed']:.1%}"`
+of mortality on
+`{python} fmt(bd.loc['V2->V3 mortality (deduped, published)','common_rows'])`
+after collapsing the phantom stage dimension). By contrast, the
 within-V3 scraper scope expansion of `2026-05-28` added 122,041 incidence
 rows while changing zero values on 1,299,615 common rows, and the
 `2026-08-24` hardening changed zero values on 1.99 million common incidence
 and mortality rows; both are therefore capture-scope changes, not new
-vintages. <!-- chunk-needed: recompute boundary decomposition from the
-deposits -->
+vintages. <!-- chunk-needed: recompute the two within-V3 zero-change
+comparisons from the deposits -->
 
 ```{python}
 #| label: fig-vintages
@@ -690,6 +752,13 @@ absolute difference of
 `{python} f"{(sc.rate_v3 - sc.rate_v2).abs().median():.1f}"` per 100,000
 (interquartile range
 `{python} f"{(sc.rate_v3 - sc.rate_v2).abs().quantile(0.25):.1f}"`–`{python} f"{(sc.rate_v3 - sc.rate_v2).abs().quantile(0.75):.1f}"`).
+Near-total value change is expected from the window advance alone, since
+consecutive vintages share four of five years of a moving average; the
+fraction changed establishes only that revision is pervasive. The
+magnitude distribution, together with the reporting-delay literature cited
+in Background, is the evidence that vintage choice matters, and the
+non-independence of consecutive vintages is restated as a usage caution in
+Usage Notes.
 
 Vintage boundaries are bracketed, not dated: V1→V2 is bounded by a
 six-month gap in captures and V2→V3 by a missing monthly release. An
@@ -698,17 +767,23 @@ window uncaptured; the archive claims only the vintages it holds.
 
 ## Coverage
 
-Mortality coverage is essentially complete and stable (3,084–3,087
-distinct counties per release, no state ever absent), consistent with its
-vital-statistics origin. Incidence coverage depends on state registry
-publication decisions and grows across vintages: 2,694 counties in V1,
-2,933 in V2, 3,029 in V3. Kansas has no county-level incidence in any
-vintage (state-level Kansas incidence appears only from `2026-05-28`),
-while its county-level mortality is complete throughout; the gap is the
-missing block in @fig-maps (a). Indiana county incidence is absent in V1
-and V2 and present, all 92 counties, from V3. Minnesota, Nevada, and
-Virginia county incidence are missing only in V1.
-<!-- chunk-needed: county coverage counts from the deposits -->
+Mortality coverage is essentially complete and stable
+(`{python} fmt(cov.loc[('V2','mortality'),'counties'])`–`{python} fmt(cov.loc[('V1','mortality'),'counties'])`
+distinct published counties across the three vintages' best captures, no
+state ever absent), consistent with its vital-statistics origin. Incidence
+coverage depends on state registry publication decisions and grows across
+vintages: `{python} fmt(cov.loc[('V1','incidence'),'counties'])` counties
+in V1, `{python} fmt(cov.loc[('V2','incidence'),'counties'])` in V2,
+`{python} fmt(cov.loc[('V3','incidence'),'counties'])` in V3 (computed
+from the deposited best captures). Kansas has
+`{python} int(cov.loc[('V3','incidence'),'kansas'])` published county
+incidence cells in any vintage (state-level Kansas incidence appears only
+from `2026-05-28`), while its county-level mortality covers
+`{python} int(cov.loc[('V3','mortality'),'kansas'])` of Kansas's 105
+counties in V3; the gap is the missing block in @fig-maps (a). Indiana county
+incidence is absent in V1 and V2 and present, all
+`{python} int(cov.loc[('V3','incidence'),'indiana'])` counties, from V3.
+Minnesota, Nevada, and Virginia county incidence are missing only in V1.
 
 ## Schema stability
 
@@ -722,7 +797,15 @@ category vocabularies across every release.
 ## Suppression census
 
 In post-hardening files suppression is countable directly from
-`suppression_reason`. In the stratum mapped in @fig-maps (b), lung and
+`suppression_reason`. Across the full V3 incidence file,
+`{python} fmt(int(cen_tot['suppressed_small_count']))` cells are
+suppressed for small counts and
+`{python} fmt(int(cen_tot['withheld_state_law']))` are withheld under
+state law, the latter entirely in
+`{python} ", ".join(withheld_states)`; the per-state census is
+`data/suppression_census.csv`. Published, suppressed, and withheld cells
+sum to the file's `{python} fmt(int(cen.cells.sum()))` rows, so no
+unrecognized marker produced a null rate without a reason code. In the stratum mapped in @fig-maps (b), lung and
 bronchus, all races, both sexes, the site returned 3,143 county cells:
 2,797 published, 241 suppressed for small counts, and 105 (every Kansas
 county) withheld under state law, matching a reconciliation of the same
@@ -730,8 +813,6 @@ stratum pulled live from the site's export URL on 2026-08-23. Historical release
 post-hardening captures of the same vintage are substantially larger than
 earlier ones: the difference consists of retained suppressed cells and the
 added state-level tier, not changed estimates.
-<!-- chunk-needed: full suppression census by state and reason from the
-V3 deposit -->
 
 ## Mirror integrity
 
@@ -752,14 +833,18 @@ count in the deposited manifest, and rendering fails on any mismatch.
 
 ## Cross-topic joins
 
-The four topics share FIPS geographic keys, and incidence × mortality
-joins on `fips` plus the shared demographic dimensions are exercised in
-the pipeline's tests. The demographics topic carries a race/ethnicity
-vocabulary that only partially maps to the incidence/mortality one; the
-harmonized view reconciles the mappable categories through the checked-in
-crosswalk and leaves unmappable categories topic-local rather than forcing
-a lossy alignment. <!-- chunk-needed: run the advertised join in a chunk
-against the deposit before submission -->
+The four topics share FIPS geographic keys. Joining the all-sites
+county strata of the V3 deposit on `fips` (computed by the derivation
+script) matches `{python} fmt(int(jc.joined_counties))` counties from
+`{python} fmt(int(jc.inc_counties))` incidence and
+`{python} fmt(int(jc.mort_counties))` mortality counties; the
+`{python} int(jc.mort_only)` mortality-only counties are the Kansas
+asymmetry described above. The demographics topic carries
+`{python} int(jc.demo_race_labels)` distinct race/ethnicity labels, of
+which `{python} int(jc.demo_race_mapped)` map exactly to the
+incidence/mortality vocabulary through the checked-in crosswalk; the
+remainder name populations with no exact equivalent and stay topic-local
+rather than being forced into a lossy alignment.
 
 # Usage Notes
 
@@ -812,7 +897,9 @@ being able to characterize what was withheld
 **Screening and risk-factor estimates are modelled.** They are small-area
 model estimates combining BRFSS and NHIS survey data
 [@raghunathan2007combining; @liu2019smallarea; @liu2025psa], not
-registry-observed counts. They can change between captures because the
+registry-observed counts. (Related county-level modelled prevalence
+products exist, for example CDC PLACES; the estimates here are SCP's own
+product as served.) They can change between captures because the
 model was refit, not because the underlying population changed. For this
 reason vintage identity is keyed on incidence and mortality only; the
 Zenodo deposit for a vintage carries the newest screening/demographics

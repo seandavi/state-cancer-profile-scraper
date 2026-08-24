@@ -29,8 +29,9 @@ core_claims:
     DOIs — one per distinct upstream data vintage.
   - >-
     The archive preserves superseded vintages that no live query client can
-    recover; ~98% of estimate values were revised at each observed vintage
-    boundary, so vintage identity materially affects downstream analysis.
+    recover; ~97% of estimate values were revised at each observed vintage
+    boundary (computed from the deposits by rate-value comparison on common
+    strata), so vintage identity materially affects downstream analysis.
   - >-
     From the first post-hardening release forward, suppressed cells are
     decoded into typed nulls with an explicit suppression-reason column,
