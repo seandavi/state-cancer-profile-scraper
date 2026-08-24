@@ -95,10 +95,32 @@ class ZenodoClient:
     # -- write side ----------------------------------------------------
     def new_version_draft(self, record_id: str) -> dict:
         """POST newversion, then return the draft deposition (work against
-        links.latest_draft, never the original id)."""
-        resp = self._request(
-            "POST", f"/api/deposit/depositions/{record_id}/actions/newversion"
-        ).json()
+        links.latest_draft, never the original id).
+
+        If a new-version draft already exists (e.g. an interrupted earlier
+        run), some Zenodo responses refuse the action — find and reuse the
+        concept's existing draft instead of failing.
+        """
+        try:
+            resp = self._request(
+                "POST", f"/api/deposit/depositions/{record_id}/actions/newversion"
+            ).json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code not in (400, 403, 409):
+                raise
+            source = self._request(
+                "GET", f"/api/deposit/depositions/{record_id}"
+            ).json()
+            concept = source.get("conceptrecid")
+            drafts = self._request(
+                "GET", "/api/deposit/depositions",
+                params={"status": "draft", "size": 25},
+            ).json()
+            for d in drafts:
+                if d.get("conceptrecid") == concept:
+                    logger.info("Reusing existing draft %s", d["id"])
+                    return d
+            raise
         draft_url = resp["links"]["latest_draft"]
         return self._request("GET", draft_url).json()
 
