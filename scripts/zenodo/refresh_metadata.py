@@ -46,7 +46,9 @@ def main() -> int:
         if vid not in deposits:
             logging.info("skip %s (%s) — not a vintage version", version["doi"], title[:50])
             continue
-        md = zenodo.vintage_metadata(deposits[vid])
+        manifest_path = Path("manifests") / f"{deposits[vid].best_capture}.json"
+        manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else None
+        md = zenodo.vintage_metadata(deposits[vid], manifest=manifest)
         logging.info("refresh %s (%s)%s", version["doi"], vid, " [dry-run]" if args.dry_run else "")
         if args.dry_run:
             continue

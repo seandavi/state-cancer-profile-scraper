@@ -163,7 +163,17 @@ class VintageDeposit:
     files: list[Path]
 
 
-def vintage_metadata(dep: VintageDeposit, repo: str = "seandavi/state-cancer-profile-scraper") -> dict:
+def _inventory_notes(manifest: dict) -> str:
+    """Plain-text file inventory for the record's Additional-notes field —
+    published versions cannot gain files, so the forensics live in metadata."""
+    lines = ["Files in this deposit (sha256 | size | rows):"]
+    for f in manifest["files"]:
+        rows = f" | {f['rows']:,} rows" if "rows" in f else ""
+        lines.append(f"{f['filename']}: {f['sha256']} | {f['bytes']:,} bytes{rows}")
+    return "\n".join(lines)
+
+
+def vintage_metadata(dep: VintageDeposit, repo: str = "seandavi/state-cancer-profile-scraper", manifest: dict | None = None) -> dict:
     """Deposit metadata for one vintage version.
 
     ``related_identifiers`` carries every GitHub tag that captured the
@@ -196,7 +206,7 @@ def vintage_metadata(dep: VintageDeposit, repo: str = "seandavi/state-cancer-pro
         f"https://github.com/{repo}/blob/main/docs/releases.md</p>"
         + _topics_paragraph(dep)
     )
-    return {
+    md = {
         "title": f"United States State Cancer Profiles data extract — vintage {dep.vintage_id}",
         "upload_type": "dataset",
         "publication_date": dep.publication_date,
@@ -209,6 +219,9 @@ def vintage_metadata(dep: VintageDeposit, repo: str = "seandavi/state-cancer-pro
             for u in tag_urls
         ],
     }
+    if manifest:
+        md["notes"] = _inventory_notes(manifest)
+    return md
 
 
 def _topics_paragraph(dep: VintageDeposit) -> str:
@@ -275,7 +288,7 @@ def plan_backfill(
     return plan
 
 
-def run_deposit(client: ZenodoClient, base_record_id: str, dep: VintageDeposit, dry_run: bool = False) -> str | None:
+def run_deposit(client: ZenodoClient, base_record_id: str, dep: VintageDeposit, dry_run: bool = False, manifest: dict | None = None) -> str | None:
     """Execute one vintage deposit as a new version of ``base_record_id``.
     Returns the new record id (or None on dry run)."""
     logger.info(
@@ -300,7 +313,7 @@ def run_deposit(client: ZenodoClient, base_record_id: str, dep: VintageDeposit, 
     for path in dep.files:
         logger.info("  upload %s (%d bytes)", path.name, path.stat().st_size)
         client.upload_file(draft, path)
-    client.set_metadata(draft, vintage_metadata(dep))
+    client.set_metadata(draft, vintage_metadata(dep, manifest=manifest))
     published = client.publish(draft)
     logger.info("  published %s -> %s", dep.vintage_id, published.get("doi"))
     return str(published.get("id"))

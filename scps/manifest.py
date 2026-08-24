@@ -135,3 +135,84 @@ def assign_vintage(manifest: dict, vintages: dict) -> tuple[str, bool]:
             return vid, False
     latest = max(vintages["vintages"], key=lambda v: int(v.lstrip("V")))
     return f"V{int(latest.lstrip('V')) + 1}", True
+
+
+# ---------------------------------------------------------------------------
+# 00_README.txt — NLM-style deposit documentation (generated, never hand-kept)
+# ---------------------------------------------------------------------------
+
+_FILE_BLURBS = (
+    ("state_cancer_profiles_incidence", "Cancer incidence: age-adjusted rates per 100,000 with 95% CIs, trend statistics, and average annual counts, one row per statistical stratum (cancer site x race/ethnicity x sex x age x stage) x locale (county/state/US). From the first 2026-08-24 release onward, upstream-suppressed cells are retained as empty rate fields with an explicit suppression_reason column (suppressed_small_count = fewer than 16 cases; withheld_state_law = Kansas counties); in earlier releases suppressed rows are absent entirely. Source: SEER/NPCR registries via statecancerprofiles.cancer.gov."),
+    ("state_cancer_profiles_mortality", "Cancer mortality: same layout as incidence, without the stage dimension (not applicable to death rates; releases before 2026-08-24 carry a spurious stage column that duplicates every row — see the repository's docs). Source: NCHS vital statistics via statecancerprofiles.cancer.gov."),
+    ("state_cancer_profiles_risk", "Screening and risk-factor prevalence (e.g. smoking, binge drinking, mammography). These are MODEL-BASED small-area estimates built from BRFSS survey data, not registry observations, and refresh on their own cadence independent of the incidence/mortality vintage."),
+    ("state_cancer_profiles_demographics", "Demographic and social-determinant indicators (poverty, education, insurance, SVI, population) from the American Community Survey and related sources, by county/state."),
+    ("notes_", "Verbatim title and footnote blocks from the upstream CSV export for this topic: data windows, source registries, submission year, and suppression-rule definitions as stated by NCI at scrape time."),
+    ("scrape_catalog.jsonl", "One JSON line per query combination known to return data; the exact request inventory this release was scraped from (provenance for every row's originating query)."),
+    ("select_options.json", "The query vocabulary (cancer sites, race/ethnicity, ages, stages...) as served by the website's own form controls at scrape time."),
+    ("gh_hash.txt", "Git commit of the scraper code that produced this release, in the repository below."),
+    ("manifest.json", "Machine-readable inventory: sha256, byte size, row count, and content hash per file, plus provenance fields extracted from the notes."),
+    ("release_note.txt", "Short human note attached to the GitHub release."),
+    ("00_README.txt", "This file."),
+)
+
+
+def _blurb(filename: str) -> str:
+    for prefix, text in _FILE_BLURBS:
+        if filename.startswith(prefix):
+            return text
+    return ""
+
+
+def render_readme(manifest: dict, vintage_id: str, vintages: dict) -> str:
+    """NLM-style plain-text documentation of one deposit's files and provenance."""
+    info = vintages["vintages"][vintage_id]
+    tags = ", ".join(info["releases"])
+    doi = info.get("doi", "(this version)")
+    concept = vintages.get("concept_doi", "10.5281/zenodo.11098814")
+    lines = [
+        "00_README.txt",
+        f"United States State Cancer Profiles data extract - vintage {vintage_id}",
+        "=" * 72,
+        "",
+        "WHAT THIS IS",
+        "",
+        "A complete national county- and state-level extract of the NCI/CDC State",
+        "Cancer Profiles website (statecancerprofiles.cancer.gov), which offers no",
+        "API, bulk download, or archive of prior estimates. A VINTAGE is one",
+        "edition of the upstream estimates: the complete set of values the site",
+        "served during some period, bounded by NCI silently replacing them with",
+        "revised values. Several dated scrapes that captured identical values",
+        "belong to one vintage; this deposit preserves one such edition.",
+        "",
+        "PROVENANCE",
+        "",
+        f"  Vintage:            {vintage_id} (first captured {info['first_capture']})",
+        f"  Deposited bytes:    GitHub release {info['best_capture']} (the vintage's most complete capture)",
+        f"  All capturing tags: {tags}",
+        f"  Version DOI:        {doi}",
+        f"  Concept DOI:        {concept} (always resolves to the latest vintage)",
+        "  Scraper:            https://github.com/seandavi/state-cancer-profile-scraper",
+        "                      (commit in gh_hash.txt; methods in docs/releases.md)",
+        "  License:            CC-BY-4.0",
+        "",
+        "FILES",
+        "",
+    ]
+    for f in manifest["files"]:
+        size = f"{f['bytes']:,} bytes"
+        rows = f" | {f['rows']:,} rows" if "rows" in f else ""
+        lines.append(f"  {f['filename']}  ({size}{rows})")
+        lines.append(f"    sha256: {f['sha256']}")
+        blurb = _blurb(f["filename"])
+        if blurb:
+            import textwrap
+            lines.extend(textwrap.wrap(blurb, width=70, initial_indent="    ", subsequent_indent="    "))
+        lines.append("")
+    lines += [
+        "CITATION",
+        "",
+        f"  Davis S. United States State Cancer Profiles data extract - vintage {vintage_id}.",
+        f"  Zenodo. https://doi.org/{doi}" if doi != "(this version)" else "  Zenodo. (DOI of this version)",
+        "",
+    ]
+    return "\n".join(lines) + "\n"
