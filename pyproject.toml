@@ -20,6 +20,13 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
 ]
+manuscript = [
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
+    "geopandas>=1.0",
+    "matplotlib>=3.8",
+    "duckdb>=1.0",
+]
 
 [project.scripts]
 scps-scraper = "scps.cli:cli"
