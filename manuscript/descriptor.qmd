@@ -166,7 +166,9 @@ and where the choice of vintage is known to change analytic conclusions
 [@croushore2001realtime; @croushore2003vintage]. Cancer surveillance exhibits
 the same phenomenon: reporting delay and reporting error revise incidence
 rates for years after first publication, by enough to change the direction of
-fitted trends [@clegg2002reportingdelay; @das2008completeness]. At each
+fitted trends [@clegg2002reportingdelay], a consequence of the same
+case-ascertainment lag that completeness-of-ascertainment methods are built
+to quantify [@das2008completeness]. At each
 vintage boundary observed in this archive, approximately
 `{python} f"{pct_revised:.0%}"` of previously published estimate
 values changed (Technical Validation).
@@ -191,8 +193,9 @@ values without any indication of change. An earlier R client was abandoned in
 2017 [@silentspring_rscp], and a public repository contains an unpublished
 national SCP sweep feeding a dashboard pipeline, with no release, no registry
 entry, and no DOI [@ciodata_ciftools]. The demand for bulk access is
-nonetheless visible in the workarounds: at least three CRAN packages ship
-hand-frozen, single-window SCP slices as example data
+nonetheless visible in the workarounds: at least three CRAN packages have
+shipped hand-frozen, single-window SCP slices as example data (one,
+`SeerMapper`, was archived from CRAN in 2023)
 [@sarkar_latticeextra; @pearson_seermapper; @otto_spgarch], and the one
 SCP-derived deposit we located in a generalist data repository is a
 single-site, single-window analysis slice [@acharjee2020airquality].
@@ -331,13 +334,17 @@ that constitute the extract's provenance.
 SCP withholds a cell for two documented reasons: counts below 16 in an
 area-sex-race category ("data has been suppressed to ensure confidentiality
 and stability of rate estimates"), and state legislation prohibiting release
-of county-level data. Suppression of this kind is standard practice in
-federal health statistics [@klein2002suppression; @parker2017proportions;
-@talih2023ratesstandards], and NCI's own surveillance program identifies
-county-level suppression as a material limitation of county cancer
-reporting [@tatalovich2022zonedesign]. Adjacent work on census differential
-privacy likewise shows that upstream disclosure-limitation choices propagate
-unevenly into small-area health estimates
+of county-level data. Suppression of small-area cells follows a documented
+federal tradition of protecting rate reliability in health statistics
+[@klein2002suppression], one shared by the reliability and presentation
+standards NCHS applies to its own small-area estimates
+[@parker2017proportions; @talih2023ratesstandards], and NCI's own
+surveillance program identifies county-level suppression as a material
+limitation of county cancer reporting [@tatalovich2022zonedesign]. Adjacent
+work on census differential privacy shows that upstream disclosure-limitation
+choices can affect small-area health estimates unevenly across population
+subgroups, though reported effect sizes vary by geography and outcome, from
+disproportionate in some analyses to negligible in others
 [@santoslozada2020dp; @krieger2021dp; @li2023dpmapping]. In SCP's export the
 two cases appear as an asterisk or a footnote marker inside otherwise
 numeric columns. The scraper decodes them before numeric coercion: the row
