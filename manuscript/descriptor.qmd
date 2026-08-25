@@ -65,13 +65,13 @@ def fmt(n):
 
 # Abstract {.unnumbered}
 
-State Cancer Profiles (statecancerprofiles.cancer.gov), maintained by the
+State Cancer Profiles (https://statecancerprofiles.cancer.gov), maintained by the
 National Cancer Institute with the Centers for Disease Control and Prevention,
 is a widely used source of county- and state-level cancer statistics in the
-United States, used for cancer-center catchment-area surveillance and for
+United States. It serves as one of the primary sources for cancer-center catchment-area surveillance and for
 geographic studies of cancer burden, screening, and access to care. The
-site offers no API, no bulk download, and no archive of
-prior estimates: its sole machine-readable export returns one statistical
+site offers no formal API, no bulk download, and no archive of
+prior estimates. Its sole machine-readable export returns one statistical
 stratum per HTTP request, and when the underlying data are updated the
 previous estimates are overwritten and become unrecoverable. This resource
 provides the complete national county- and state-level extract of all four
@@ -83,11 +83,9 @@ minted per distinct upstream data *vintage*, the set of values the site
 served between successive replacements. Three vintages have been captured to date; at each
 observed vintage boundary roughly
 `{python} f"{pct_revised:.0%}"` of estimate values changed, so
-which vintage an analysis draws on affects its results. From the 2026-08-24 release
-forward, cells that the upstream site suppresses are retained as typed nulls
-with an explicit suppression-reason column. Capture has been automated on an
-approximately monthly cadence since February 2025, and each future upstream
-revision will be preserved as a new vintage.
+which vintage an analysis draws on affects its results. We expect that our work will increase the 
+value of the State Cancer Profiles data by rendering it fit for data science,
+machine learning, and broad reuse. 
 
 # Background & Summary
 
