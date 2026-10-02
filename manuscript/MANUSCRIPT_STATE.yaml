@@ -12,7 +12,7 @@ project:
   source_format: quarto
 
 document_phase:
-  current: submitted  # medRxiv, 2026-08-24; Scientific Data revision pending
+  current: submitted  # medRxiv: submitted 2026-08-24, posted 2026-08-27 (doi 10.64898/2026.08.24.26361254); Scientific Data submission pending
 
 core_claims:
   - >-

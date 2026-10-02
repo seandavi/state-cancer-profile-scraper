@@ -3,6 +3,7 @@
 [![](https://img.shields.io/github/v/release/seandavi/state-cancer-profile-scraper)](https://github.com/seandavi/state-cancer-profile-scraper/release/latest)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/seandavi/state-cancer-profile-scraper/total)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/seandavi/state-cancer-profile-scraper/.github%2Fworkflows%2Frun-scrape.yaml?label=Scrape%20status)
+[![medRxiv](https://img.shields.io/badge/medRxiv-10.64898%2F2026.08.24.26361254-b31b1b)](https://doi.org/10.64898/2026.08.24.26361254)
 
 
 The [state cancer profiles website](https://statecancerprofiles.cancer.gov/) hosts visualization and data exploration tools for cancer incidence and mortality in the United States. For casual browsing, the website is great. However, if having access to the underlying data is the goal, the existing site does not have bulk downloads or an API. Therefore, **we provide bulk data scraped from the website for data science applications**.
@@ -22,9 +23,18 @@ Download from:
 
 A new release is **generated every month with the latest data**.
 
+## Citation
+
+The archive is described in a data descriptor on medRxiv:
+
+> Davis S. A versioned, analysis-ready archive of United States State Cancer Profiles county- and state-level estimates. *medRxiv*, 2026. <https://doi.org/10.64898/2026.08.24.26361254>
+
+To cite the data themselves, use the Zenodo record. Each distinct upstream *vintage* (one edition of the State Cancer Profiles estimates, as served before NCI replaced them) has its own version DOI. Cite the version DOI of the vintage you analyzed. The concept DOI [10.5281/zenodo.11098814](https://doi.org/10.5281/zenodo.11098814) always resolves to the latest vintage. GitHub releases and the Hugging Face mirror (`hf://datasets/seandavis/state-cancer-profiles`) carry no DOI.
+
 ## Contents
 
 - [State cancer profiles scraper](#state-cancer-profiles-scraper)
+- [Citation](#citation)
 - [Contents](#contents)
 - [About the code](#about-the-code)
 - [About the data](#about-the-data)

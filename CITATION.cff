@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: >-
+  If you use these data, please cite the data descriptor below and the Zenodo
+  version DOI of the vintage you analyzed (concept DOI 10.5281/zenodo.11098814).
+title: state-cancer-profile-scraper
+type: software
+authors:
+  - family-names: Davis
+    given-names: Sean
+    orcid: "https://orcid.org/0000-0002-8991-6458"
+repository-code: "https://github.com/seandavi/state-cancer-profile-scraper"
+license: MIT
+preferred-citation:
+  type: article
+  title: >-
+    A versioned, analysis-ready archive of United States State Cancer Profiles
+    county- and state-level estimates
+  authors:
+    - family-names: Davis
+      given-names: Sean
+      orcid: "https://orcid.org/0000-0002-8991-6458"
+  journal: medRxiv
+  year: 2026
+  doi: 10.64898/2026.08.24.26361254
+  url: "https://doi.org/10.64898/2026.08.24.26361254"
+references:
+  - type: data
+    title: United States State Cancer Profiles data extract
+    authors:
+      - family-names: Davis
+        given-names: Sean
+        orcid: "https://orcid.org/0000-0002-8991-6458"
+    publisher:
+      name: Zenodo
+    doi: 10.5281/zenodo.11098814
+    url: "https://doi.org/10.5281/zenodo.11098814"
